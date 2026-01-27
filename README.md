@@ -4,11 +4,14 @@ Cross-platform React Native app (Expo managed workflow) for debt tracking with S
 
 ## Tech Stack
 
-- **React Native 0.74** with Expo (managed workflow)
+- **React Native 0.74** with Expo 51 (managed workflow)
 - **TypeScript** for type safety
-- **React Navigation** for routing
+- **React Navigation 6** with native stack navigation
 - **Supabase** for backend/auth
 - **Expo Secure Store** for encrypted local storage
+- **Mixpanel** for analytics (with console fallback)
+- **React Native Reanimated** for smooth animations
+- **React Native Gesture Handler** for gesture support
 - **RevenueCat** (placeholder for subscriptions)
 - **Plaid** (placeholder for bank account linking)
 

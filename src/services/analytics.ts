@@ -1,42 +1,116 @@
+import { Mixpanel } from 'mixpanel-react-native';
 import { Config } from '../constants/config';
 
+// Initialize Mixpanel (lazy initialization)
+let mixpanel: Mixpanel | null = null;
+
+const getMixpanelInstance = async (): Promise<Mixpanel | null> => {
+  if (!Config.analytics.enabled) return null;
+  if (mixpanel) return mixpanel;
+
+  try {
+    const token = Config.analytics.mixpanelToken;
+    if (!token) {
+      console.warn('[Analytics] Mixpanel token not configured, using console logging only');
+      return null;
+    }
+
+    mixpanel = new Mixpanel(token);
+    await mixpanel?.init();
+    return mixpanel;
+  } catch (error) {
+    console.error('[Analytics] Mixpanel initialization error:', error);
+    return null;
+  }
+};
+
 /**
- * Analytics service - placeholder for integration with Mixpanel, Amplitude, or similar
- * Currently uses console logging for development
+ * Analytics service - Mixpanel integration with fallback to console logging
+ * Can be disabled via Config.analytics.enabled
  */
 export const analyticsService = {
-  trackEvent(eventName: string, properties?: Record<string, any>) {
+  async trackEvent(eventName: string, properties?: Record<string, any>) {
     if (!Config.analytics.enabled) return;
 
+    try {
+      const instance = await getMixpanelInstance();
+      if (instance) {
+        instance.track(eventName, properties || {});
+      }
+    } catch (error) {
+      console.error(`[Analytics] Event tracking error for ${eventName}:`, error);
+    }
+
+    // Fallback: log to console
     console.log(`[Analytics] Event: ${eventName}`, properties);
-
-    // TODO: Integrate with analytics provider
-    // Example: mixpanel.track(eventName, properties);
   },
 
-  trackScreen(screenName: string, properties?: Record<string, any>) {
+  async trackScreen(screenName: string, properties?: Record<string, any>) {
     if (!Config.analytics.enabled) return;
 
+    try {
+      const instance = await getMixpanelInstance();
+      if (instance) {
+        instance.trackWithProperties(`screen_${screenName}`, properties || {});
+      }
+    } catch (error) {
+      console.error(`[Analytics] Screen tracking error for ${screenName}:`, error);
+    }
+
+    // Fallback: log to console
     console.log(`[Analytics] Screen: ${screenName}`, properties);
-
-    // TODO: Integrate with analytics provider
-    // Example: mixpanel.trackPageView(screenName, properties);
   },
 
-  setUserProperties(userId: string, properties: Record<string, any>) {
+  async setUserProperties(userId: string, properties: Record<string, any>) {
     if (!Config.analytics.enabled) return;
 
+    try {
+      const instance = await getMixpanelInstance();
+      if (instance) {
+        instance.identify(userId);
+        instance.getPeople().set(properties);
+      }
+    } catch (error) {
+      console.error(`[Analytics] User property error for ${userId}:`, error);
+    }
+
+    // Fallback: log to console
     console.log(`[Analytics] Set user properties for ${userId}:`, properties);
-
-    // TODO: Integrate with analytics provider
-    // Example: mixpanel.people.set(userId, properties);
   },
 
-  trackError(error: Error, context?: Record<string, any>) {
+  async trackError(error: Error, context?: Record<string, any>) {
     if (!Config.analytics.enabled) return;
 
-    console.error(`[Analytics] Error: ${error.message}`, context);
+    const errorData = {
+      error_message: error.message,
+      error_stack: error.stack,
+      ...context,
+    };
 
-    // TODO: Integrate with error tracking (Sentry, etc.)
+    try {
+      const instance = await getMixpanelInstance();
+      if (instance) {
+        instance.trackWithProperties('app_error', errorData);
+      }
+    } catch (err) {
+      console.error('[Analytics] Error tracking failed:', err);
+    }
+
+    // Always log errors to console
+    console.error(`[Analytics] Error: ${error.message}`, errorData);
+  },
+
+  /**
+   * Reset analytics for logged-out state
+   */
+  async reset() {
+    try {
+      const instance = await getMixpanelInstance();
+      if (instance) {
+        instance.reset();
+      }
+    } catch (error) {
+      console.error('[Analytics] Reset error:', error);
+    }
   },
 };
