@@ -1,37 +1,105 @@
-# Expo
+# Expo & React Native
 .expo/
 .expo-shared/
 dist/
-npm-debug.*
+build/
+web-build/
+.eas/
+
+# Certificates & Keys (NEVER commit these)
 *.jks
+*.keystore
 *.p8
 *.p12
+*.cer
+*.crt
 *.key
+*.pem
 *.mobileprovision
+*.provisionprofile
 *.orig.*
-web-build/
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.log
+lerna-debug.log
+*.log
 
 # Node
 node_modules/
-npm-debug.log
-yarn-error.log
+.npm
+.eslintcache
+package-lock.json.bak
+yarn.lock.bak
 
-# Environment
+# Environment Variables (secrets)
 .env
 .env.local
 .env.*.local
+.env.production.local
 
-# IDE
+# IDE & Editor
 .vscode/
+.vscode-extensions
 .idea/
+.DS_Store
 *.swp
 *.swo
 *~
+*.sublime-workspace
+*.sublime-project
+.classpath
+.c9/
+*.tern-port
+.history/
+.ionide/
+.prettierignore
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+*.bak
+*~
 
-# Mobile
+# Mobile Builds (don't commit compiled binaries)
 ios/
 android/
+*.ipa
+*.apk
+*.aab
+
+# Gradle
+.gradle
+local.properties
+gradle-wrapper.jar
+
+# Xcode
+*.xcarchive
+*.dSYM/
+DerivedData/
+build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+*.lcov
+*.coverage
+
+# Misc
+.env.test
+.cache
+.parcel-cache
+dist
+
