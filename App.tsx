@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { AuthProvider } from './src/context';
 import { revenueCatService, analyticsService } from './src/services';
 import { logger } from './src/utils';
 
@@ -27,5 +28,9 @@ export default function App() {
     initializeApp();
   }, []);
 
-  return <RootNavigator />;
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
+  );
 }

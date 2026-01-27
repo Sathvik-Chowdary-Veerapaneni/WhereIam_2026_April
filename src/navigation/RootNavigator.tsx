@@ -1,35 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { authService } from '../services';
 import { RootStackParamList } from './types';
-import { logger } from '../utils';
-import { HomeScreen, LoginScreen, NotFoundScreen, TestScreen } from '../screens';
+import { useAuth } from '../context';
+import {
+  AuthScreen,
+  OnboardingScreen,
+  DashboardScreen,
+  SettingsScreen,
+  HomeScreen,
+  NotFoundScreen,
+  TestScreen,
+} from '../screens';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+// Loading screen while checking auth state
+const LoadingScreen = () => (
+  <View style={styles.loadingContainer}>
+    <ActivityIndicator size="large" color="#007AFF" />
+  </View>
+);
+
 export const RootNavigator: React.FC = () => {
-  const [isSignedIn, setIsSignedIn] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { success, user } = await authService.getCurrentUser();
-        setIsSignedIn(success && !!user);
-      } catch (error) {
-        logger.error('Auth check failed:', error);
-        setIsSignedIn(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
+  const { session, isLoading, isOnboarded } = useAuth();
 
   if (isLoading) {
-    return null; // TODO: Replace with splash screen
+    return <LoadingScreen />;
   }
 
   return (
@@ -38,37 +36,69 @@ export const RootNavigator: React.FC = () => {
         screenOptions={{
           headerShown: true,
           headerBackTitleVisible: false,
+          headerStyle: {
+            backgroundColor: '#0A0A0F',
+          },
+          headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
+          contentStyle: {
+            backgroundColor: '#0A0A0F',
+          },
         }}
       >
-        {isSignedIn ? (
-          // App Stack
-          <>
-            <Stack.Screen 
-              name="Home" 
-              component={HomeScreen}
-              options={{ title: 'Debt Mirror' }}
-            />
-            <Stack.Screen 
-              name="Test" 
-              component={TestScreen}
-              options={{ title: 'Test' }}
-            />
-          </>
-        ) : (
-          // Auth Stack
+        {!session ? (
+          // Auth Stack - User not signed in
           <>
             <Stack.Screen
               name="Auth"
-              component={LoginScreen}
+              component={AuthScreen}
               options={{
-                animationEnabled: false,
-                title: 'Sign In',
+                headerShown: false,
+                animationTypeForReplace: 'pop',
               }}
             />
-            <Stack.Screen 
-              name="Test" 
+          </>
+        ) : !isOnboarded ? (
+          // Onboarding Stack - User signed in but not onboarded
+          <>
+            <Stack.Screen
+              name="Onboarding"
+              component={OnboardingScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+          </>
+        ) : (
+          // App Stack - User signed in and onboarded
+          <>
+            <Stack.Screen
+              name="Dashboard"
+              component={DashboardScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{
+                title: 'Settings',
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="Home"
+              component={HomeScreen}
+              options={{ title: 'Debt Mirror' }}
+            />
+            <Stack.Screen
+              name="Test"
               component={TestScreen}
-              options={{ title: 'Test Connection' }}
+              options={{ title: 'Test' }}
             />
           </>
         )}
@@ -85,3 +115,12 @@ export const RootNavigator: React.FC = () => {
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0A0A0F',
+  },
+});

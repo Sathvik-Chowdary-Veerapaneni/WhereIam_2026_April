@@ -103,3 +103,6 @@ coverage/
 .parcel-cache
 dist
 
+# Database schemas (keep local only)
+*.sql
+migrations/
