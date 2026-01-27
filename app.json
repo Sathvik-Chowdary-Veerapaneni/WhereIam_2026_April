@@ -3,6 +3,7 @@
     "name": "Debt Mirror",
     "slug": "debt-mirror",
     "version": "1.0.0",
+    "scheme": "debtmirror",
     "assetBundlePatterns": [
       "**/*"
     ],

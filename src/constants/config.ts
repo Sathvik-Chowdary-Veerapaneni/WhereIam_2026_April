@@ -14,4 +14,7 @@ export const Config = {
   revenueCat: {
     apiKey: process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || '',
   },
+  auth: {
+    redirectUrl: 'debtmirror://auth/callback',
+  },
 };

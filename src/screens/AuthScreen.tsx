@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,14 +11,32 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
-import { authService } from '../services';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import { authService, supabase } from '../services';
 import { logger } from '../utils';
+import { Config } from '../constants/config';
+
+// Required for expo-auth-session to work properly
+WebBrowser.maybeCompleteAuthSession();
 
 export const AuthScreen: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
+
+    // Create redirect URI for OAuth
+    // For Expo Go, we need to use the exp:// scheme
+    const redirectUri = AuthSession.makeRedirectUri({
+        // Use the Expo scheme for development
+        // This generates: exp://192.168.x.x:8081/--/auth/callback
+    });
+
+    // Log the redirect URI for debugging (development only)
+    useEffect(() => {
+        logger.info('OAuth Redirect URI:', redirectUri);
+    }, []);
 
     const handleAuth = async () => {
         if (!email.trim() || !password.trim()) {
@@ -62,6 +80,61 @@ export const AuthScreen: React.FC = () => {
         setIsSignUp(!isSignUp);
         setEmail('');
         setPassword('');
+    };
+
+    const handleGoogleAuth = async () => {
+        setLoading(true);
+        try {
+            // Get the OAuth URL from Supabase
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: redirectUri,
+                    skipBrowserRedirect: true, // We handle the browser ourselves
+                },
+            });
+
+            if (error) throw error;
+            if (!data.url) throw new Error('No OAuth URL returned');
+
+            logger.info('Opening Google OAuth URL:', data.url);
+            logger.info('Redirect URI:', redirectUri);
+
+            // Open the browser for authentication
+            const result = await WebBrowser.openAuthSessionAsync(
+                data.url,
+                redirectUri
+            );
+
+            if (result.type === 'success' && result.url) {
+                // Extract the tokens from the URL
+                const url = new URL(result.url);
+                const params = new URLSearchParams(url.hash.slice(1)); // Remove the # prefix
+
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+
+                if (accessToken) {
+                    // Set the session in Supabase
+                    const { error: sessionError } = await supabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken || '',
+                    });
+
+                    if (sessionError) throw sessionError;
+                    logger.info('Google sign-in successful!');
+                } else {
+                    throw new Error('No access token in callback URL');
+                }
+            } else if (result.type === 'cancel') {
+                logger.info('User cancelled Google sign-in');
+            }
+        } catch (error) {
+            logger.error('Google auth error:', error);
+            Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -121,6 +194,33 @@ export const AuthScreen: React.FC = () => {
                                 </Text>
                             )}
                         </TouchableOpacity>
+
+                        {/* Social Auth */}
+                        <View style={styles.socialContainer}>
+                            <View style={styles.dividerContainer}>
+                                <View style={styles.divider} />
+                                <Text style={styles.dividerText}>OR</Text>
+                                <View style={styles.divider} />
+                            </View>
+
+                            <TouchableOpacity
+                                style={[styles.socialButton, styles.googleButton]}
+                                onPress={handleGoogleAuth}
+                                disabled={loading}
+                            >
+                                <Text style={styles.socialButtonText}>Continue with Google</Text>
+                            </TouchableOpacity>
+
+                            {/* Apple Sign In - Hidden for now
+                            <TouchableOpacity
+                                style={[styles.socialButton, styles.appleButton]}
+                                onPress={() => handleSocialAuth('apple')}
+                                disabled={loading}
+                            >
+                                <Text style={[styles.socialButtonText, styles.appleButtonText]}>Continue with Apple</Text>
+                            </TouchableOpacity>
+                            */}
+                        </View>
 
                         <TouchableOpacity
                             style={styles.toggleButton}
@@ -215,5 +315,47 @@ const styles = StyleSheet.create({
         color: '#007AFF',
         fontSize: 15,
         fontWeight: '500',
+    },
+    socialContainer: {
+        marginTop: 16,
+        gap: 12,
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 12,
+    },
+    divider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#2C2C2E',
+    },
+    dividerText: {
+        color: '#8E8E93',
+        marginHorizontal: 12,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    socialButton: {
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+    },
+    googleButton: {
+        backgroundColor: '#FFFFFF',
+    },
+    appleButton: {
+        backgroundColor: '#000000',
+        borderColor: '#3A3A3C',
+    },
+    socialButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#000000', // Default for Google
+    },
+    appleButtonText: {
+        color: '#FFFFFF',
     },
 });

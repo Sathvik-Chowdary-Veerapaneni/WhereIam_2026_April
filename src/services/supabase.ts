@@ -28,6 +28,23 @@ export const authService = {
     }
   },
 
+  async signInWithOAuth(provider: 'google' | 'apple') {
+    try {
+      // Note: This requires deep linking setup and specific platform configuration
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: Config.auth?.redirectUrl || 'debtmirror://auth/callback',
+        },
+      });
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('OAuth error:', error);
+      return { success: false, error };
+    }
+  },
+
   async signOut() {
     try {
       const { error } = await supabase.auth.signOut();
