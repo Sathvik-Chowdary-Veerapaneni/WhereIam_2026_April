@@ -9,6 +9,7 @@ export type RootStackParamList = {
   Home: undefined;
   Dashboard: undefined;
   AddDebt: undefined;
+  DebtLedger: undefined;
   Settings: undefined;
   Test: undefined;
   NotFound: undefined;

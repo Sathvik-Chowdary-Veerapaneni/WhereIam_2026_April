@@ -10,6 +10,7 @@ import {
   DashboardScreen,
   SettingsScreen,
   AddDebtScreen,
+  DebtLedgerScreen,
   HomeScreen,
   NotFoundScreen,
   TestScreen,
@@ -96,6 +97,14 @@ export const RootNavigator: React.FC = () => {
               component={AddDebtScreen}
               options={{
                 title: 'Add Debt',
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="DebtLedger"
+              component={DebtLedgerScreen}
+              options={{
+                title: 'Debt Ledger',
                 presentation: 'card',
               }}
             />

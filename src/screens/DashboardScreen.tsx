@@ -145,10 +145,17 @@ export const DashboardScreen: React.FC = () => {
                 {/* Totals Section */}
                 <Text style={styles.sectionTitle}>Overview</Text>
                 <View style={styles.statsGrid}>
-                    <View style={styles.statCard}>
+                    <TouchableOpacity
+                        style={[styles.statCard, styles.statCardClickable]}
+                        onPress={() => navigation.navigate('DebtLedger')}
+                        activeOpacity={0.7}
+                    >
                         <Text style={styles.statLabel}>Total Debts</Text>
-                        <Text style={styles.statValue}>{totals.totalDebts}</Text>
-                    </View>
+                        <View style={styles.statValueRow}>
+                            <Text style={styles.statValue}>{totals.totalDebts}</Text>
+                            <Text style={styles.chevron}>›</Text>
+                        </View>
+                    </TouchableOpacity>
                     <View style={[styles.statCard, styles.statCardLarge]}>
                         <Text style={styles.statLabel}>Total Balance</Text>
                         <Text style={[styles.statValueLarge, totals.totalBalance > 0 && styles.statValueRed]}>
@@ -337,6 +344,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#2C2C2E',
     },
+    statCardClickable: {
+        borderColor: '#3A3A3C',
+    },
     statCardLarge: {
         width: '48%',
     },
@@ -349,6 +359,16 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '700',
         color: '#FFFFFF',
+    },
+    statValueRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    chevron: {
+        fontSize: 20,
+        color: '#8E8E93',
+        marginLeft: 8,
     },
     statValueLarge: {
         fontSize: 22,
