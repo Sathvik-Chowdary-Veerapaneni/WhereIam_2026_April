@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Home: undefined;
   Dashboard: undefined;
+  AddDebt: undefined;
   Settings: undefined;
   Test: undefined;
   NotFound: undefined;

@@ -4,3 +4,5 @@ export { secureStorage, STORAGE_KEYS } from './storage';
 export { analyticsService } from './analytics';
 export { plaidService } from './plaid';
 export { revenueCatService } from './revenueCat';
+export { debtsService } from './debts';
+

@@ -9,6 +9,7 @@ import {
   OnboardingScreen,
   DashboardScreen,
   SettingsScreen,
+  AddDebtScreen,
   HomeScreen,
   NotFoundScreen,
   TestScreen,
@@ -87,6 +88,14 @@ export const RootNavigator: React.FC = () => {
               component={SettingsScreen}
               options={{
                 title: 'Settings',
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="AddDebt"
+              component={AddDebtScreen}
+              options={{
+                title: 'Add Debt',
                 presentation: 'card',
               }}
             />
