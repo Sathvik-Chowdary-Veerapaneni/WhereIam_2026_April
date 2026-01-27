@@ -18,15 +18,7 @@ import { logger } from '../utils';
 
 type DashboardNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 
-const DEBT_TYPE_ICONS: Record<string, string> = {
-    credit_card: '💳',
-    loan: '🏦',
-    student_loan: '🎓',
-    mortgage: '🏠',
-    auto_loan: '🚗',
-    medical: '🏥',
-    other: '📋',
-};
+
 
 export const DashboardScreen: React.FC = () => {
     const navigation = useNavigation<DashboardNavigationProp>();
@@ -150,20 +142,20 @@ export const DashboardScreen: React.FC = () => {
                         onPress={() => navigation.navigate('DebtLedger')}
                         activeOpacity={0.7}
                     >
-                        <Text style={styles.statLabel}>Total Debts</Text>
+                        <Text style={styles.statLabel}>Debts List</Text>
                         <View style={styles.statValueRow}>
                             <Text style={styles.statValue}>{totals.totalDebts}</Text>
                             <Text style={styles.chevron}>›</Text>
                         </View>
                     </TouchableOpacity>
                     <View style={[styles.statCard, styles.statCardLarge]}>
-                        <Text style={styles.statLabel}>Total Balance</Text>
+                        <Text style={styles.statLabel}>Total Debt</Text>
                         <Text style={[styles.statValueLarge, totals.totalBalance > 0 && styles.statValueRed]}>
                             {formatCurrency(totals.totalBalance)}
                         </Text>
                     </View>
                     <View style={styles.statCard}>
-                        <Text style={styles.statLabel}>Monthly Payment</Text>
+                        <Text style={styles.statLabel}>Total Monthly Debt</Text>
                         <Text style={styles.statValue}>{formatCurrency(totals.totalMinPayment)}</Text>
                     </View>
                     <View style={styles.statCard}>
@@ -192,43 +184,7 @@ export const DashboardScreen: React.FC = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Debts List */}
-                {debts.length > 0 && (
-                    <>
-                        <Text style={styles.sectionTitle}>Your Debts</Text>
-                        <View style={styles.debtsList}>
-                            {debts.map((debt) => (
-                                <TouchableOpacity
-                                    key={debt.id}
-                                    style={styles.debtCard}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={styles.debtIcon}>
-                                        <Text style={styles.debtIconText}>
-                                            {DEBT_TYPE_ICONS[debt.debt_type] || '📋'}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.debtInfo}>
-                                        <Text style={styles.debtName}>{debt.name}</Text>
-                                        <Text style={styles.debtType}>
-                                            {debt.creditor_name || debt.debt_type.replace('_', ' ')}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.debtAmount}>
-                                        <Text style={styles.debtBalance}>
-                                            {formatCurrency(debt.current_balance)}
-                                        </Text>
-                                        {debt.interest_rate != null && (
-                                            <Text style={styles.debtRate}>{debt.interest_rate}% APR</Text>
-                                        )}
-                                    </View>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </>
-                )}
-
-                {/* Empty State */}
+                {/* Empty State / Call to Action */}
                 {debts.length === 0 && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>💸</Text>
@@ -401,57 +357,7 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontWeight: '500',
     },
-    debtsList: {
-        gap: 12,
-    },
-    debtCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#1C1C1E',
-        borderRadius: 12,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: '#2C2C2E',
-    },
-    debtIcon: {
-        width: 44,
-        height: 44,
-        backgroundColor: '#2C2C2E',
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    debtIconText: {
-        fontSize: 20,
-    },
-    debtInfo: {
-        flex: 1,
-    },
-    debtName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FFFFFF',
-        marginBottom: 2,
-    },
-    debtType: {
-        fontSize: 13,
-        color: '#8E8E93',
-        textTransform: 'capitalize',
-    },
-    debtAmount: {
-        alignItems: 'flex-end',
-    },
-    debtBalance: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#FF3B30',
-    },
-    debtRate: {
-        fontSize: 12,
-        color: '#8E8E93',
-        marginTop: 2,
-    },
+
     emptyState: {
         alignItems: 'center',
         paddingVertical: 40,
