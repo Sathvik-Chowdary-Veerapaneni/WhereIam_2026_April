@@ -104,7 +104,7 @@ export const RootNavigator: React.FC = () => {
               name="DebtLedger"
               component={DebtLedgerScreen}
               options={{
-                title: 'Debt Ledger',
+                title: 'Debts List',
                 presentation: 'card',
               }}
             />
