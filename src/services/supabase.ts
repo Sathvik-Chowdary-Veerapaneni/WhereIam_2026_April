@@ -1,0 +1,52 @@
+import { createClient } from '@supabase/supabase-js';
+import { Config } from '../constants/config';
+
+// Initialize Supabase client
+export const supabase = createClient(Config.supabase.url, Config.supabase.anonKey);
+
+// Auth service
+export const authService = {
+  async signUp(email: string, password: string) {
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+      return { success: true, user: data.user };
+    } catch (error) {
+      console.error('Sign up error:', error);
+      return { success: false, error };
+    }
+  },
+
+  async signIn(email: string, password: string) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      return { success: true, user: data.user };
+    } catch (error) {
+      console.error('Sign in error:', error);
+      return { success: false, error };
+    }
+  },
+
+  async signOut() {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Sign out error:', error);
+      return { success: false, error };
+    }
+  },
+
+  async getCurrentUser() {
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) throw error;
+      return { success: true, user: data.user };
+    } catch (error) {
+      console.error('Get current user error:', error);
+      return { success: false, error };
+    }
+  },
+};
