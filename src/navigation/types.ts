@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Home: undefined;
   Dashboard: undefined;
   Settings: undefined;
+  Test: undefined;
   NotFound: undefined;
 };
 

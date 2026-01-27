@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { authService } from '../services';
 import { RootStackParamList } from './types';
 import { logger } from '../utils';
-import { HomeScreen, LoginScreen, NotFoundScreen } from '../screens';
+import { HomeScreen, LoginScreen, NotFoundScreen, TestScreen } from '../screens';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -36,21 +36,41 @@ export const RootNavigator: React.FC = () => {
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerShown: false,
+          headerShown: true,
+          headerBackTitleVisible: false,
         }}
       >
         {isSignedIn ? (
           // App Stack
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <>
+            <Stack.Screen 
+              name="Home" 
+              component={HomeScreen}
+              options={{ title: 'Debt Mirror' }}
+            />
+            <Stack.Screen 
+              name="Test" 
+              component={TestScreen}
+              options={{ title: 'Test' }}
+            />
+          </>
         ) : (
           // Auth Stack
-          <Stack.Screen
-            name="Auth"
-            component={LoginScreen}
-            options={{
-              animationEnabled: false,
-            }}
-          />
+          <>
+            <Stack.Screen
+              name="Auth"
+              component={LoginScreen}
+              options={{
+                animationEnabled: false,
+                title: 'Sign In',
+              }}
+            />
+            <Stack.Screen 
+              name="Test" 
+              component={TestScreen}
+              options={{ title: 'Test Connection' }}
+            />
+          </>
         )}
 
         {/* Common error screen */}
@@ -58,7 +78,7 @@ export const RootNavigator: React.FC = () => {
           name="NotFound"
           component={NotFoundScreen}
           options={{
-            title: 'Oops!',
+            title: 'Not Found',
           }}
         />
       </Stack.Navigator>
