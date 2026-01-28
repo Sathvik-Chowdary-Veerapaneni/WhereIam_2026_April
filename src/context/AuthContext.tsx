@@ -123,11 +123,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
-                    // Small delay to ensure DB trigger has run for new users
-                    setTimeout(async () => {
-                        await checkAdminStatus(session.user.id);
-                        await checkOnboardingStatus();
-                    }, 500);
+                    // Check statuses with the user from session directly (not from state)
+                    await checkAdminStatus(session.user.id);
+
+                    // Check onboarding status directly with userId from session
+                    try {
+                        const { data, error } = await supabase
+                            .from('income')
+                            .select('id')
+                            .eq('user_id', session.user.id)
+                            .limit(1);
+
+                        if (error) {
+                            logger.error('Error checking onboarding status:', error);
+                            setIsOnboarded(false);
+                        } else {
+                            const onboarded = data && data.length > 0;
+                            logger.info('Onboarding status for user:', onboarded);
+                            setIsOnboarded(onboarded);
+                        }
+                    } catch (error) {
+                        logger.error('Onboarding check failed:', error);
+                        setIsOnboarded(false);
+                    }
                 } else {
                     setIsOnboarded(false);
                     setIsAdmin(false);
