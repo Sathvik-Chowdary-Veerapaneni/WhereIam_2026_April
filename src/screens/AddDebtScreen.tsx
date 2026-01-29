@@ -38,7 +38,7 @@ export const AddDebtScreen: React.FC = () => {
     const [showCurrencySelector, setShowCurrencySelector] = useState(false);
     const [selectedCurrencyCode, setSelectedCurrencyCode] = useState('USD');
 
-    // Form state
+    // Form state - store raw numeric values as strings
     const [name, setName] = useState('');
     const [debtType, setDebtType] = useState<string | null>(null);
     const [creditorName, setCreditorName] = useState('');
@@ -47,6 +47,93 @@ export const AddDebtScreen: React.FC = () => {
     const [minimumPayment, setMinimumPayment] = useState('');
 
     const selectedCurrency = getCurrencyByCode(selectedCurrencyCode);
+
+    // Extract raw numeric value from formatted string
+    const extractNumber = (value: string): string => {
+        // Remove all non-numeric characters except decimal point
+        return value.replace(/[^0-9.]/g, '').replace(/(\..*)\.*/g, '$1');
+    };
+
+    // Format number with thousand separators based on currency locale
+    const formatWithThousandSeparator = (value: string): string => {
+        if (!value) return '';
+
+        const rawValue = extractNumber(value);
+        if (!rawValue) return '';
+
+        // Split into integer and decimal parts
+        const parts = rawValue.split('.');
+        const integerPart = parts[0];
+        const decimalPart = parts.length > 1 ? parts[1] : null;
+
+        if (!integerPart) return decimalPart !== null ? '.' + decimalPart : '';
+
+        // Format the integer part with thousand separators
+        const numericValue = parseInt(integerPart, 10);
+        if (isNaN(numericValue)) return rawValue;
+
+        // Use locale-aware formatting
+        const locale = selectedCurrency.locale;
+        let formatted: string;
+
+        try {
+            formatted = new Intl.NumberFormat(locale, {
+                maximumFractionDigits: 0,
+                useGrouping: true,
+            }).format(numericValue);
+        } catch {
+            // Fallback to US formatting
+            formatted = numericValue.toLocaleString('en-US');
+        }
+
+        // Re-add decimal part if it exists (preserve user's typing)
+        if (decimalPart !== null) {
+            // Get the decimal separator for this locale
+            const decimalSeparator = locale.startsWith('de') || locale.startsWith('fr') || locale.startsWith('es') || locale.startsWith('pt') ? ',' : '.';
+            formatted += decimalSeparator + decimalPart;
+        } else if (value.endsWith('.') || value.endsWith(',')) {
+            // User just typed a decimal point
+            const decimalSeparator = locale.startsWith('de') || locale.startsWith('fr') || locale.startsWith('es') || locale.startsWith('pt') ? ',' : '.';
+            formatted += decimalSeparator;
+        }
+
+        return formatted;
+    };
+
+    // Handle currency input change with formatting
+    const handleCurrencyInput = (
+        text: string,
+        setter: React.Dispatch<React.SetStateAction<string>>
+    ) => {
+        const formatted = formatWithThousandSeparator(text);
+        setter(formatted);
+    };
+
+    // Parse formatted value back to number for submission
+    const parseFormattedValue = (formatted: string): number => {
+        if (!formatted) return 0;
+        // Remove all thousand separators (commas, periods, spaces, apostrophes)
+        // But keep the decimal separator
+        const locale = selectedCurrency.locale;
+        let cleaned = formatted;
+
+        if (locale.startsWith('de') || locale.startsWith('fr') || locale.startsWith('es') || locale.startsWith('pt')) {
+            // European format: periods are thousand sep, comma is decimal
+            cleaned = formatted.replace(/\./g, '').replace(',', '.');
+        } else if (locale === 'en-IN') {
+            // Indian format: commas are thousand sep, period is decimal  
+            cleaned = formatted.replace(/,/g, '');
+        } else if (locale === 'de-CH') {
+            // Swiss format: apostrophes are thousand sep
+            cleaned = formatted.replace(/'/g, '');
+        } else {
+            // US/UK format: commas are thousand sep, period is decimal
+            cleaned = formatted.replace(/,/g, '');
+        }
+
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? 0 : num;
+    };
 
     const formatNumber = (value: string): string => {
         return value.replace(/[^0-9.]/g, '').replace(/(\..*)\.*/g, '$1');
@@ -61,8 +148,8 @@ export const AddDebtScreen: React.FC = () => {
             Alert.alert('Error', 'Please select a debt type');
             return false;
         }
-        const balance = parseFloat(currentBalance);
-        if (!currentBalance || isNaN(balance) || balance <= 0) {
+        const balance = parseFormattedValue(currentBalance);
+        if (!currentBalance || balance <= 0) {
             Alert.alert('Error', 'Please enter a valid balance amount');
             return false;
         }
@@ -71,6 +158,13 @@ export const AddDebtScreen: React.FC = () => {
 
     const handleCurrencySelect = (currency: Currency) => {
         setSelectedCurrencyCode(currency.code);
+        // Re-format existing values with new locale
+        if (currentBalance) {
+            setCurrentBalance(prev => formatWithThousandSeparator(extractNumber(prev)));
+        }
+        if (minimumPayment) {
+            setMinimumPayment(prev => formatWithThousandSeparator(extractNumber(prev)));
+        }
     };
 
     const handleSubmit = async () => {
@@ -78,9 +172,9 @@ export const AddDebtScreen: React.FC = () => {
 
         setLoading(true);
         try {
-            const balance = parseFloat(currentBalance);
-            const rate = interestRate ? parseFloat(interestRate) : undefined;
-            const minPay = minimumPayment ? parseFloat(minimumPayment) : undefined;
+            const balance = parseFormattedValue(currentBalance);
+            const rate = interestRate ? parseFloat(formatNumber(interestRate)) : undefined;
+            const minPay = minimumPayment ? parseFormattedValue(minimumPayment) : undefined;
 
             const input: CreateDebtInput = {
                 name: name.trim(),
@@ -188,7 +282,7 @@ export const AddDebtScreen: React.FC = () => {
                                 placeholderTextColor="#666"
                                 keyboardType="decimal-pad"
                                 value={currentBalance}
-                                onChangeText={(text) => setCurrentBalance(formatNumber(text))}
+                                onChangeText={(text) => handleCurrencyInput(text, setCurrentBalance)}
                                 editable={!loading}
                             />
                         </View>
@@ -225,7 +319,7 @@ export const AddDebtScreen: React.FC = () => {
                                 placeholderTextColor="#666"
                                 keyboardType="decimal-pad"
                                 value={minimumPayment}
-                                onChangeText={(text) => setMinimumPayment(formatNumber(text))}
+                                onChangeText={(text) => handleCurrencyInput(text, setMinimumPayment)}
                                 editable={!loading}
                             />
                         </View>
