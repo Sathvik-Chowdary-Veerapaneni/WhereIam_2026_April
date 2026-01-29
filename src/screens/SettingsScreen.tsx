@@ -223,4 +223,26 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FF3B30',
     },
+    currencyRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    currencyRowRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    currencyFlag: {
+        fontSize: 24,
+    },
+    currencyValue: {
+        fontSize: 16,
+        color: '#007AFF',
+        fontWeight: '500',
+    },
+    chevron: {
+        fontSize: 20,
+        color: '#8E8E93',
+    },
 });

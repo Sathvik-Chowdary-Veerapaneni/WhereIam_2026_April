@@ -8,6 +8,7 @@ export interface Debt {
     description?: string;
     debt_type: string;
     creditor_name?: string;
+    currency_code: string;
     principal: number;
     current_balance: number;
     interest_rate?: number;
@@ -26,6 +27,7 @@ export interface CreateDebtInput {
     description?: string;
     debt_type: string;
     creditor_name?: string;
+    currency_code: string;
     principal: number;
     current_balance: number;
     interest_rate?: number;
@@ -51,6 +53,7 @@ export const debtsService = {
                     description: input.description || null,
                     debt_type: input.debt_type,
                     creditor_name: input.creditor_name || null,
+                    currency_code: input.currency_code || 'USD',
                     principal: input.principal,
                     current_balance: input.current_balance,
                     interest_rate: input.interest_rate || null,
@@ -175,6 +178,53 @@ export const debtsService = {
             return { success: true };
         } catch (error) {
             logger.error('Delete debt error:', error);
+            return { success: false, error: error as Error };
+        }
+    },
+
+    // Get debt totals grouped by currency
+    async getDebtTotalsByCurrency(): Promise<{
+        success: boolean;
+        totalsByCurrency?: { [currencyCode: string]: { totalBalance: number; totalMinPayment: number; debtCount: number } };
+        totalDebts?: number;
+        avgInterestRate?: number;
+        error?: Error;
+    }> {
+        try {
+            const { success, debts, error } = await this.listDebts();
+            if (!success || !debts) {
+                throw error || new Error('Failed to fetch debts');
+            }
+
+            const activeDebts = debts.filter(d => d.status === 'active');
+
+            // Group totals by currency
+            const totalsByCurrency: { [currencyCode: string]: { totalBalance: number; totalMinPayment: number; debtCount: number } } = {};
+
+            for (const debt of activeDebts) {
+                const currencyCode = debt.currency_code || 'USD';
+                if (!totalsByCurrency[currencyCode]) {
+                    totalsByCurrency[currencyCode] = { totalBalance: 0, totalMinPayment: 0, debtCount: 0 };
+                }
+                totalsByCurrency[currencyCode].totalBalance += debt.current_balance || 0;
+                totalsByCurrency[currencyCode].totalMinPayment += debt.minimum_payment || 0;
+                totalsByCurrency[currencyCode].debtCount += 1;
+            }
+
+            // Calculate average interest rate across all debts
+            const debtsWithRate = activeDebts.filter(d => d.interest_rate != null);
+            const avgInterestRate = debtsWithRate.length > 0
+                ? debtsWithRate.reduce((sum, d) => sum + (d.interest_rate || 0), 0) / debtsWithRate.length
+                : 0;
+
+            return {
+                success: true,
+                totalsByCurrency,
+                totalDebts: activeDebts.length,
+                avgInterestRate,
+            };
+        } catch (error) {
+            logger.error('Get debt totals by currency error:', error);
             return { success: false, error: error as Error };
         }
     },

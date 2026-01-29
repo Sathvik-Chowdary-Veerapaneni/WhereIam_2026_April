@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { debtsService, Debt } from '../services/debts';
 import { logger } from '../utils';
+import { formatCurrencyAmount, getCurrencyByCode } from '../constants/currencies';
 
 const DEBT_TYPE_ICONS: Record<string, string> = {
     credit_card: '💳',
@@ -33,21 +34,24 @@ const DEBT_TYPE_LABELS: Record<string, string> = {
     other: 'Other',
 };
 
+interface CurrencyTotal {
+    totalBalance: number;
+    totalMinPayment: number;
+    debtCount: number;
+}
+
 export const DebtLedgerScreen: React.FC = () => {
     const [debts, setDebts] = useState<Debt[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [totals, setTotals] = useState({
-        totalBalance: 0,
-        totalDebts: 0,
-        totalMinPayment: 0,
-    });
+    const [totalsByCurrency, setTotalsByCurrency] = useState<{ [currencyCode: string]: CurrencyTotal }>({});
+    const [totalDebts, setTotalDebts] = useState(0);
 
     const fetchData = useCallback(async () => {
         try {
             const [debtsResult, totalsResult] = await Promise.all([
                 debtsService.listDebts(),
-                debtsService.getDebtTotals(),
+                debtsService.getDebtTotalsByCurrency(),
             ]);
 
             if (debtsResult.success && debtsResult.debts) {
@@ -55,11 +59,8 @@ export const DebtLedgerScreen: React.FC = () => {
             }
 
             if (totalsResult.success) {
-                setTotals({
-                    totalBalance: totalsResult.totalBalance || 0,
-                    totalDebts: totalsResult.totalDebts || 0,
-                    totalMinPayment: totalsResult.totalMinPayment || 0,
-                });
+                setTotalsByCurrency(totalsResult.totalsByCurrency || {});
+                setTotalDebts(totalsResult.totalDebts || 0);
             }
         } catch (error) {
             logger.error('Debt ledger fetch error:', error);
@@ -80,13 +81,8 @@ export const DebtLedgerScreen: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    const formatCurrency = (amount: number): string => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2,
-        }).format(amount);
-    };
+    // Get sorted currency codes for display
+    const sortedCurrencyCodes = Object.keys(totalsByCurrency).sort();
 
     const formatDate = (dateString?: string): string => {
         if (!dateString) return '—';
@@ -122,27 +118,28 @@ export const DebtLedgerScreen: React.FC = () => {
                     />
                 }
             >
-                {/* Summary Header */}
+                {/* Summary Header - Totals by Currency */}
                 <View style={styles.summaryCard}>
                     <View style={styles.summaryRow}>
                         <View style={styles.summaryItem}>
                             <Text style={styles.summaryLabel}>Total Debts</Text>
-                            <Text style={styles.summaryValue}>{totals.totalDebts}</Text>
+                            <Text style={styles.summaryValue}>{totalDebts}</Text>
                         </View>
-                        <View style={styles.summaryDivider} />
-                        <View style={styles.summaryItem}>
-                            <Text style={styles.summaryLabel}>Total Balance</Text>
-                            <Text style={[styles.summaryValue, styles.summaryValueRed]}>
-                                {formatCurrency(totals.totalBalance)}
-                            </Text>
-                        </View>
-                        <View style={styles.summaryDivider} />
-                        <View style={styles.summaryItem}>
-                            <Text style={styles.summaryLabel}>Monthly</Text>
-                            <Text style={styles.summaryValue}>
-                                {formatCurrency(totals.totalMinPayment)}
-                            </Text>
-                        </View>
+                        {sortedCurrencyCodes.map((code, index) => {
+                            const totals = totalsByCurrency[code];
+                            const currency = getCurrencyByCode(code);
+                            return (
+                                <React.Fragment key={code}>
+                                    <View style={styles.summaryDivider} />
+                                    <View style={styles.summaryItem}>
+                                        <Text style={styles.summaryLabel}>{currency.flag} {code}</Text>
+                                        <Text style={[styles.summaryValue, styles.summaryValueRed]}>
+                                            {formatCurrencyAmount(totals.totalBalance, code)}
+                                        </Text>
+                                    </View>
+                                </React.Fragment>
+                            );
+                        })}
                     </View>
                 </View>
 
@@ -156,55 +153,66 @@ export const DebtLedgerScreen: React.FC = () => {
                 {/* Ledger Entries */}
                 {debts.length > 0 ? (
                     <View style={styles.ledgerContainer}>
-                        {debts.map((debt, index) => (
-                            <TouchableOpacity
-                                key={debt.id}
-                                style={[
-                                    styles.ledgerRow,
-                                    index === debts.length - 1 && styles.ledgerRowLast,
-                                ]}
-                                activeOpacity={0.7}
-                            >
-                                <View style={styles.ledgerDebtInfo}>
-                                    <View style={styles.ledgerIcon}>
-                                        <Text style={styles.ledgerIconText}>
-                                            {DEBT_TYPE_ICONS[debt.debt_type] || '📋'}
+                        {debts.map((debt, index) => {
+                            const debtCurrency = getCurrencyByCode(debt.currency_code || 'USD');
+                            return (
+                                <TouchableOpacity
+                                    key={debt.id}
+                                    style={[
+                                        styles.ledgerRow,
+                                        index === debts.length - 1 && styles.ledgerRowLast,
+                                    ]}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.ledgerDebtInfo}>
+                                        <View style={styles.ledgerIcon}>
+                                            <Text style={styles.ledgerIconText}>
+                                                {DEBT_TYPE_ICONS[debt.debt_type] || '📋'}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.ledgerDebtDetails}>
+                                            <Text style={styles.ledgerDebtName} numberOfLines={1}>
+                                                {debt.name}
+                                            </Text>
+                                            <Text style={styles.ledgerDebtType}>
+                                                {debtCurrency.flag} {debt.creditor_name || DEBT_TYPE_LABELS[debt.debt_type] || 'Other'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.ledgerApr}>
+                                        <Text style={styles.ledgerAprValue}>
+                                            {debt.interest_rate != null ? `${debt.interest_rate}%` : '—'}
                                         </Text>
                                     </View>
-                                    <View style={styles.ledgerDebtDetails}>
-                                        <Text style={styles.ledgerDebtName} numberOfLines={1}>
-                                            {debt.name}
+                                    <View style={styles.ledgerBalance}>
+                                        <Text style={styles.ledgerBalanceValue}>
+                                            {formatCurrencyAmount(debt.current_balance, debt.currency_code || 'USD')}
                                         </Text>
-                                        <Text style={styles.ledgerDebtType}>
-                                            {debt.creditor_name || DEBT_TYPE_LABELS[debt.debt_type] || 'Other'}
-                                        </Text>
+                                        {debt.minimum_payment != null && debt.minimum_payment > 0 && (
+                                            <Text style={styles.ledgerMinPayment}>
+                                                Min: {formatCurrencyAmount(debt.minimum_payment, debt.currency_code || 'USD')}
+                                            </Text>
+                                        )}
                                     </View>
-                                </View>
-                                <View style={styles.ledgerApr}>
-                                    <Text style={styles.ledgerAprValue}>
-                                        {debt.interest_rate != null ? `${debt.interest_rate}%` : '—'}
-                                    </Text>
-                                </View>
-                                <View style={styles.ledgerBalance}>
-                                    <Text style={styles.ledgerBalanceValue}>
-                                        {formatCurrency(debt.current_balance)}
-                                    </Text>
-                                    {debt.minimum_payment != null && debt.minimum_payment > 0 && (
-                                        <Text style={styles.ledgerMinPayment}>
-                                            Min: {formatCurrency(debt.minimum_payment)}
-                                        </Text>
-                                    )}
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                                </TouchableOpacity>
+                            );
+                        })}
 
-                        {/* Ledger Footer / Totals */}
-                        <View style={styles.ledgerFooter}>
-                            <Text style={styles.ledgerFooterLabel}>Total Outstanding</Text>
-                            <Text style={styles.ledgerFooterValue}>
-                                {formatCurrency(totals.totalBalance)}
-                            </Text>
-                        </View>
+                        {/* Ledger Footer / Totals by Currency */}
+                        {sortedCurrencyCodes.map((code) => {
+                            const totals = totalsByCurrency[code];
+                            const currency = getCurrencyByCode(code);
+                            return (
+                                <View key={code} style={styles.ledgerFooter}>
+                                    <Text style={styles.ledgerFooterLabel}>
+                                        {currency.flag} Total {code}
+                                    </Text>
+                                    <Text style={styles.ledgerFooterValue}>
+                                        {formatCurrencyAmount(totals.totalBalance, code)}
+                                    </Text>
+                                </View>
+                            );
+                        })}
                     </View>
                 ) : (
                     <View style={styles.emptyState}>

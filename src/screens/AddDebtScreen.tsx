@@ -17,6 +17,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { debtsService, CreateDebtInput } from '../services/debts';
 import { logger } from '../utils';
+import { CurrencySelector, CurrencyPickerButton } from '../components';
+import { Currency, getCurrencyByCode } from '../constants/currencies';
 
 type AddDebtNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddDebt'>;
 
@@ -33,8 +35,10 @@ const DEBT_TYPES = [
 export const AddDebtScreen: React.FC = () => {
     const navigation = useNavigation<AddDebtNavigationProp>();
     const [loading, setLoading] = useState(false);
+    const [showCurrencySelector, setShowCurrencySelector] = useState(false);
+    const [selectedCurrencyCode, setSelectedCurrencyCode] = useState('USD');
 
-    // Form state
+    // Form state - store raw numeric values as strings
     const [name, setName] = useState('');
     const [debtType, setDebtType] = useState<string | null>(null);
     const [creditorName, setCreditorName] = useState('');
@@ -42,8 +46,97 @@ export const AddDebtScreen: React.FC = () => {
     const [interestRate, setInterestRate] = useState('');
     const [minimumPayment, setMinimumPayment] = useState('');
 
+    const selectedCurrency = getCurrencyByCode(selectedCurrencyCode);
+
+    // Extract raw numeric value from formatted string
+    const extractNumber = (value: string): string => {
+        // Remove all non-numeric characters except decimal point
+        return value.replace(/[^0-9.]/g, '').replace(/(\..*)\.*/g, '$1');
+    };
+
+    // Format number with thousand separators based on currency locale
+    const formatWithThousandSeparator = (value: string): string => {
+        if (!value) return '';
+
+        const rawValue = extractNumber(value);
+        if (!rawValue) return '';
+
+        // Split into integer and decimal parts
+        const parts = rawValue.split('.');
+        const integerPart = parts[0];
+        const decimalPart = parts.length > 1 ? parts[1] : null;
+
+        if (!integerPart) return decimalPart !== null ? '.' + decimalPart : '';
+
+        // Format the integer part with thousand separators
+        const numericValue = parseInt(integerPart, 10);
+        if (isNaN(numericValue)) return rawValue;
+
+        // Use locale-aware formatting
+        const locale = selectedCurrency.locale;
+        let formatted: string;
+
+        try {
+            formatted = new Intl.NumberFormat(locale, {
+                maximumFractionDigits: 0,
+                useGrouping: true,
+            }).format(numericValue);
+        } catch {
+            // Fallback to US formatting
+            formatted = numericValue.toLocaleString('en-US');
+        }
+
+        // Re-add decimal part if it exists (preserve user's typing)
+        if (decimalPart !== null) {
+            // Get the decimal separator for this locale
+            const decimalSeparator = locale.startsWith('de') || locale.startsWith('fr') || locale.startsWith('es') || locale.startsWith('pt') ? ',' : '.';
+            formatted += decimalSeparator + decimalPart;
+        } else if (value.endsWith('.') || value.endsWith(',')) {
+            // User just typed a decimal point
+            const decimalSeparator = locale.startsWith('de') || locale.startsWith('fr') || locale.startsWith('es') || locale.startsWith('pt') ? ',' : '.';
+            formatted += decimalSeparator;
+        }
+
+        return formatted;
+    };
+
+    // Handle currency input change with formatting
+    const handleCurrencyInput = (
+        text: string,
+        setter: React.Dispatch<React.SetStateAction<string>>
+    ) => {
+        const formatted = formatWithThousandSeparator(text);
+        setter(formatted);
+    };
+
+    // Parse formatted value back to number for submission
+    const parseFormattedValue = (formatted: string): number => {
+        if (!formatted) return 0;
+        // Remove all thousand separators (commas, periods, spaces, apostrophes)
+        // But keep the decimal separator
+        const locale = selectedCurrency.locale;
+        let cleaned = formatted;
+
+        if (locale.startsWith('de') || locale.startsWith('fr') || locale.startsWith('es') || locale.startsWith('pt')) {
+            // European format: periods are thousand sep, comma is decimal
+            cleaned = formatted.replace(/\./g, '').replace(',', '.');
+        } else if (locale === 'en-IN') {
+            // Indian format: commas are thousand sep, period is decimal  
+            cleaned = formatted.replace(/,/g, '');
+        } else if (locale === 'de-CH') {
+            // Swiss format: apostrophes are thousand sep
+            cleaned = formatted.replace(/'/g, '');
+        } else {
+            // US/UK format: commas are thousand sep, period is decimal
+            cleaned = formatted.replace(/,/g, '');
+        }
+
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? 0 : num;
+    };
+
     const formatNumber = (value: string): string => {
-        return value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+        return value.replace(/[^0-9.]/g, '').replace(/(\..*)\.*/g, '$1');
     };
 
     const validateForm = (): boolean => {
@@ -55,12 +148,23 @@ export const AddDebtScreen: React.FC = () => {
             Alert.alert('Error', 'Please select a debt type');
             return false;
         }
-        const balance = parseFloat(currentBalance);
-        if (!currentBalance || isNaN(balance) || balance <= 0) {
+        const balance = parseFormattedValue(currentBalance);
+        if (!currentBalance || balance <= 0) {
             Alert.alert('Error', 'Please enter a valid balance amount');
             return false;
         }
         return true;
+    };
+
+    const handleCurrencySelect = (currency: Currency) => {
+        setSelectedCurrencyCode(currency.code);
+        // Re-format existing values with new locale
+        if (currentBalance) {
+            setCurrentBalance(prev => formatWithThousandSeparator(extractNumber(prev)));
+        }
+        if (minimumPayment) {
+            setMinimumPayment(prev => formatWithThousandSeparator(extractNumber(prev)));
+        }
     };
 
     const handleSubmit = async () => {
@@ -68,14 +172,15 @@ export const AddDebtScreen: React.FC = () => {
 
         setLoading(true);
         try {
-            const balance = parseFloat(currentBalance);
-            const rate = interestRate ? parseFloat(interestRate) : undefined;
-            const minPay = minimumPayment ? parseFloat(minimumPayment) : undefined;
+            const balance = parseFormattedValue(currentBalance);
+            const rate = interestRate ? parseFloat(formatNumber(interestRate)) : undefined;
+            const minPay = minimumPayment ? parseFormattedValue(minimumPayment) : undefined;
 
             const input: CreateDebtInput = {
                 name: name.trim(),
                 debt_type: debtType!,
                 creditor_name: creditorName.trim() || undefined,
+                currency_code: selectedCurrencyCode,
                 principal: balance,
                 current_balance: balance,
                 interest_rate: rate,
@@ -167,14 +272,17 @@ export const AddDebtScreen: React.FC = () => {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Current Balance *</Text>
                         <View style={styles.currencyInput}>
-                            <Text style={styles.currencySymbol}>$</Text>
+                            <CurrencyPickerButton
+                                currencyCode={selectedCurrencyCode}
+                                onPress={() => setShowCurrencySelector(true)}
+                            />
                             <TextInput
                                 style={styles.currencyField}
                                 placeholder="0.00"
                                 placeholderTextColor="#666"
                                 keyboardType="decimal-pad"
                                 value={currentBalance}
-                                onChangeText={(text) => setCurrentBalance(formatNumber(text))}
+                                onChangeText={(text) => handleCurrencyInput(text, setCurrentBalance)}
                                 editable={!loading}
                             />
                         </View>
@@ -201,14 +309,17 @@ export const AddDebtScreen: React.FC = () => {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Minimum Monthly Payment</Text>
                         <View style={styles.currencyInput}>
-                            <Text style={styles.currencySymbol}>$</Text>
+                            <CurrencyPickerButton
+                                currencyCode={selectedCurrencyCode}
+                                onPress={() => setShowCurrencySelector(true)}
+                            />
                             <TextInput
                                 style={styles.currencyField}
                                 placeholder="0.00"
                                 placeholderTextColor="#666"
                                 keyboardType="decimal-pad"
                                 value={minimumPayment}
-                                onChangeText={(text) => setMinimumPayment(formatNumber(text))}
+                                onChangeText={(text) => handleCurrencyInput(text, setMinimumPayment)}
                                 editable={!loading}
                             />
                         </View>
@@ -228,6 +339,14 @@ export const AddDebtScreen: React.FC = () => {
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Currency Selector Modal */}
+            <CurrencySelector
+                visible={showCurrencySelector}
+                onClose={() => setShowCurrencySelector(false)}
+                onSelect={handleCurrencySelect}
+                selectedCurrencyCode={selectedCurrencyCode}
+            />
         </SafeAreaView>
     );
 };
@@ -299,11 +418,24 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#2C2C2E',
     },
+    currencySymbolButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 16,
+        paddingRight: 8,
+        paddingVertical: 14,
+        borderRightWidth: 1,
+        borderRightColor: '#2C2C2E',
+    },
     currencySymbol: {
         fontSize: 18,
         fontWeight: '600',
+        color: '#007AFF',
+    },
+    currencyDropdown: {
+        fontSize: 10,
         color: '#8E8E93',
-        paddingLeft: 16,
+        marginLeft: 4,
     },
     percentSymbol: {
         fontSize: 18,
@@ -317,7 +449,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#FFFFFF',
         paddingVertical: 14,
-        paddingHorizontal: 8,
+        paddingHorizontal: 12,
     },
     submitButton: {
         backgroundColor: '#007AFF',
@@ -335,3 +467,4 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+

@@ -15,10 +15,15 @@ import { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context';
 import { debtsService, Debt } from '../services/debts';
 import { logger } from '../utils';
+import { formatCurrencyAmount, getCurrencyByCode } from '../constants/currencies';
 
 type DashboardNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 
-
+interface CurrencyTotal {
+    totalBalance: number;
+    totalMinPayment: number;
+    debtCount: number;
+}
 
 export const DashboardScreen: React.FC = () => {
     const navigation = useNavigation<DashboardNavigationProp>();
@@ -27,18 +32,15 @@ export const DashboardScreen: React.FC = () => {
     const [debts, setDebts] = useState<Debt[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [totals, setTotals] = useState({
-        totalBalance: 0,
-        totalDebts: 0,
-        avgInterestRate: 0,
-        totalMinPayment: 0,
-    });
+    const [totalsByCurrency, setTotalsByCurrency] = useState<{ [currencyCode: string]: CurrencyTotal }>({});
+    const [totalDebts, setTotalDebts] = useState(0);
+    const [avgInterestRate, setAvgInterestRate] = useState(0);
 
     const fetchData = useCallback(async () => {
         try {
             const [debtsResult, totalsResult] = await Promise.all([
                 debtsService.listDebts(),
-                debtsService.getDebtTotals(),
+                debtsService.getDebtTotalsByCurrency(),
             ]);
 
             if (debtsResult.success && debtsResult.debts) {
@@ -46,12 +48,9 @@ export const DashboardScreen: React.FC = () => {
             }
 
             if (totalsResult.success) {
-                setTotals({
-                    totalBalance: totalsResult.totalBalance || 0,
-                    totalDebts: totalsResult.totalDebts || 0,
-                    avgInterestRate: totalsResult.avgInterestRate || 0,
-                    totalMinPayment: totalsResult.totalMinPayment || 0,
-                });
+                setTotalsByCurrency(totalsResult.totalsByCurrency || {});
+                setTotalDebts(totalsResult.totalDebts || 0);
+                setAvgInterestRate(totalsResult.avgInterestRate || 0);
             }
         } catch (error) {
             logger.error('Dashboard fetch error:', error);
@@ -73,13 +72,8 @@ export const DashboardScreen: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    const formatCurrency = (amount: number): string => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2,
-        }).format(amount);
-    };
+    // Get sorted currency codes for display
+    const sortedCurrencyCodes = Object.keys(totalsByCurrency).sort();
 
     if (loading) {
         return (
@@ -128,8 +122,8 @@ export const DashboardScreen: React.FC = () => {
                     </View>
                     <Text style={styles.characterTitle}>Your Financial Avatar</Text>
                     <Text style={styles.characterSubtitle}>
-                        {totals.totalDebts > 0
-                            ? `Fighting ${totals.totalDebts} debt${totals.totalDebts > 1 ? 's' : ''}!`
+                        {totalDebts > 0
+                            ? `Fighting ${totalDebts} debt${totalDebts > 1 ? 's' : ''}!`
                             : 'Add your first debt to begin the journey!'}
                     </Text>
                 </View>
@@ -144,25 +138,42 @@ export const DashboardScreen: React.FC = () => {
                     >
                         <Text style={styles.statLabel}>Debts List</Text>
                         <View style={styles.statValueRow}>
-                            <Text style={styles.statValue}>{totals.totalDebts}</Text>
+                            <Text style={styles.statValue}>{totalDebts}</Text>
                             <Text style={styles.chevron}>›</Text>
                         </View>
                     </TouchableOpacity>
-                    <View style={[styles.statCard, styles.statCardLarge]}>
-                        <Text style={styles.statLabel}>Total Debt</Text>
-                        <Text style={[styles.statValueLarge, totals.totalBalance > 0 && styles.statValueRed]}>
-                            {formatCurrency(totals.totalBalance)}
-                        </Text>
-                    </View>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statLabel}>Total Monthly Debt</Text>
-                        <Text style={styles.statValue}>{formatCurrency(totals.totalMinPayment)}</Text>
-                    </View>
                     <View style={styles.statCard}>
                         <Text style={styles.statLabel}>Avg Interest</Text>
-                        <Text style={styles.statValue}>{totals.avgInterestRate.toFixed(1)}%</Text>
+                        <Text style={styles.statValue}>{avgInterestRate.toFixed(1)}%</Text>
                     </View>
                 </View>
+
+                {/* Totals By Currency */}
+                {sortedCurrencyCodes.length > 0 && (
+                    <>
+                        <Text style={styles.sectionTitle}>Total Debt by Currency</Text>
+                        <View style={styles.currencyTotalsContainer}>
+                            {sortedCurrencyCodes.map((code) => {
+                                const currency = getCurrencyByCode(code);
+                                const totals = totalsByCurrency[code];
+                                return (
+                                    <View key={code} style={styles.currencyTotalCard}>
+                                        <View style={styles.currencyTotalHeader}>
+                                            <Text style={styles.currencyFlag}>{currency.flag}</Text>
+                                            <Text style={styles.currencyCode}>{code}</Text>
+                                        </View>
+                                        <Text style={styles.currencyTotalBalance}>
+                                            {formatCurrencyAmount(totals.totalBalance, code)}
+                                        </Text>
+                                        <Text style={styles.currencyTotalSubtext}>
+                                            {totals.debtCount} debt{totals.debtCount > 1 ? 's' : ''} • Min: {formatCurrencyAmount(totals.totalMinPayment, code)}/mo
+                                        </Text>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </>
+                )}
 
                 {/* Quick Actions */}
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -389,5 +400,42 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600',
+    },
+
+    // Currency totals styles
+    currencyTotalsContainer: {
+        gap: 12,
+    },
+    currencyTotalCard: {
+        backgroundColor: '#1C1C1E',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+    },
+    currencyTotalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
+    },
+    currencyFlag: {
+        fontSize: 24,
+    },
+    currencyCode: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#8E8E93',
+        letterSpacing: 0.5,
+    },
+    currencyTotalBalance: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#FF6B6B',
+        marginBottom: 4,
+    },
+    currencyTotalSubtext: {
+        fontSize: 13,
+        color: '#8E8E93',
     },
 });
