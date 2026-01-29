@@ -165,10 +165,16 @@ export const debtsService = {
     // Delete a debt
     async deleteDebt(id: string): Promise<{ success: boolean; error?: Error }> {
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error('User not authenticated');
+            }
+
             const { error } = await supabase
                 .from('debts')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('user_id', user.id);
 
             if (error) {
                 throw error;
