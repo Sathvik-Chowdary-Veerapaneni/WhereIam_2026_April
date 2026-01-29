@@ -17,6 +17,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { debtsService, CreateDebtInput } from '../services/debts';
 import { logger } from '../utils';
+import { CurrencySelector, CurrencyPickerButton } from '../components';
+import { Currency, getCurrencyByCode } from '../constants/currencies';
 
 type AddDebtNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddDebt'>;
 
@@ -33,6 +35,8 @@ const DEBT_TYPES = [
 export const AddDebtScreen: React.FC = () => {
     const navigation = useNavigation<AddDebtNavigationProp>();
     const [loading, setLoading] = useState(false);
+    const [showCurrencySelector, setShowCurrencySelector] = useState(false);
+    const [selectedCurrencyCode, setSelectedCurrencyCode] = useState('USD');
 
     // Form state
     const [name, setName] = useState('');
@@ -42,8 +46,10 @@ export const AddDebtScreen: React.FC = () => {
     const [interestRate, setInterestRate] = useState('');
     const [minimumPayment, setMinimumPayment] = useState('');
 
+    const selectedCurrency = getCurrencyByCode(selectedCurrencyCode);
+
     const formatNumber = (value: string): string => {
-        return value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+        return value.replace(/[^0-9.]/g, '').replace(/(\..*)\.*/g, '$1');
     };
 
     const validateForm = (): boolean => {
@@ -63,6 +69,10 @@ export const AddDebtScreen: React.FC = () => {
         return true;
     };
 
+    const handleCurrencySelect = (currency: Currency) => {
+        setSelectedCurrencyCode(currency.code);
+    };
+
     const handleSubmit = async () => {
         if (!validateForm()) return;
 
@@ -76,6 +86,7 @@ export const AddDebtScreen: React.FC = () => {
                 name: name.trim(),
                 debt_type: debtType!,
                 creditor_name: creditorName.trim() || undefined,
+                currency_code: selectedCurrencyCode,
                 principal: balance,
                 current_balance: balance,
                 interest_rate: rate,
@@ -167,7 +178,10 @@ export const AddDebtScreen: React.FC = () => {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Current Balance *</Text>
                         <View style={styles.currencyInput}>
-                            <Text style={styles.currencySymbol}>$</Text>
+                            <CurrencyPickerButton
+                                currencyCode={selectedCurrencyCode}
+                                onPress={() => setShowCurrencySelector(true)}
+                            />
                             <TextInput
                                 style={styles.currencyField}
                                 placeholder="0.00"
@@ -201,7 +215,10 @@ export const AddDebtScreen: React.FC = () => {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Minimum Monthly Payment</Text>
                         <View style={styles.currencyInput}>
-                            <Text style={styles.currencySymbol}>$</Text>
+                            <CurrencyPickerButton
+                                currencyCode={selectedCurrencyCode}
+                                onPress={() => setShowCurrencySelector(true)}
+                            />
                             <TextInput
                                 style={styles.currencyField}
                                 placeholder="0.00"
@@ -228,6 +245,14 @@ export const AddDebtScreen: React.FC = () => {
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Currency Selector Modal */}
+            <CurrencySelector
+                visible={showCurrencySelector}
+                onClose={() => setShowCurrencySelector(false)}
+                onSelect={handleCurrencySelect}
+                selectedCurrencyCode={selectedCurrencyCode}
+            />
         </SafeAreaView>
     );
 };
@@ -299,11 +324,24 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#2C2C2E',
     },
+    currencySymbolButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 16,
+        paddingRight: 8,
+        paddingVertical: 14,
+        borderRightWidth: 1,
+        borderRightColor: '#2C2C2E',
+    },
     currencySymbol: {
         fontSize: 18,
         fontWeight: '600',
+        color: '#007AFF',
+    },
+    currencyDropdown: {
+        fontSize: 10,
         color: '#8E8E93',
-        paddingLeft: 16,
+        marginLeft: 4,
     },
     percentSymbol: {
         fontSize: 18,
@@ -317,7 +355,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#FFFFFF',
         paddingVertical: 14,
-        paddingHorizontal: 8,
+        paddingHorizontal: 12,
     },
     submitButton: {
         backgroundColor: '#007AFF',
@@ -335,3 +373,4 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+
