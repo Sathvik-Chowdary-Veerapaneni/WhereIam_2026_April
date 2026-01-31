@@ -51,8 +51,36 @@ export const AddDebtScreen: React.FC = () => {
     const [currentBalance, setCurrentBalance] = useState('');
     const [interestRate, setInterestRate] = useState('');
     const [minimumPayment, setMinimumPayment] = useState('');
+    const [isMinPaymentManual, setIsMinPaymentManual] = useState(false);
+    const [calculatedPayment, setCalculatedPayment] = useState<number | null>(null);
 
     const selectedCurrency = getCurrencyByCode(selectedCurrencyCode);
+
+    // Calculate monthly payment based on balance and APR
+    const calculateMinimumPayment = (balance: number, apr: number): number => {
+        if (balance <= 0 || apr <= 0) return 0;
+        // Monthly interest payment = Balance * (APR / 12 / 100)
+        const monthlyPayment = balance * (apr / 100 / 12);
+        return monthlyPayment;
+    };
+
+    // Auto-calculate when balance or interest rate changes
+    useEffect(() => {
+        const balance = parseFormattedValue(currentBalance);
+        const apr = interestRate ? parseFloat(formatNumber(interestRate)) : 0;
+
+        if (balance > 0 && apr > 0) {
+            const calculated = calculateMinimumPayment(balance, apr);
+            setCalculatedPayment(Math.round(calculated * 100) / 100);
+
+            // Auto-fill if user hasn't manually edited
+            if (!isMinPaymentManual && !isEditMode) {
+                setMinimumPayment(formatWithThousandSeparator(calculated.toFixed(2)));
+            }
+        } else {
+            setCalculatedPayment(null);
+        }
+    }, [currentBalance, interestRate, isMinPaymentManual, isEditMode]);
 
     // Load existing debt data when editing
     useEffect(() => {
@@ -364,7 +392,14 @@ export const AddDebtScreen: React.FC = () => {
 
                     {/* Minimum Payment */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Minimum Monthly Payment</Text>
+                        <View style={styles.labelRow}>
+                            <Text style={styles.labelInRow}>Minimum Monthly Payment</Text>
+                            {calculatedPayment !== null && calculatedPayment > 0 && (
+                                <Text style={styles.calculatedHint}>
+                                    {isMinPaymentManual ? 'Custom' : 'Auto-calculated'}
+                                </Text>
+                            )}
+                        </View>
                         <View style={styles.currencyInput}>
                             <CurrencyPickerButton
                                 currencyCode={selectedCurrencyCode}
@@ -376,10 +411,33 @@ export const AddDebtScreen: React.FC = () => {
                                 placeholderTextColor="#666"
                                 keyboardType="decimal-pad"
                                 value={minimumPayment}
-                                onChangeText={(text) => handleCurrencyInput(text, setMinimumPayment)}
+                                onChangeText={(text) => {
+                                    setIsMinPaymentManual(true);
+                                    handleCurrencyInput(text, setMinimumPayment);
+                                }}
                                 editable={!loading}
                             />
                         </View>
+                        {/* Show calculated suggestion if user has manual value */}
+                        {isMinPaymentManual && calculatedPayment !== null && calculatedPayment > 0 && (
+                            <TouchableOpacity
+                                style={styles.useCalculatedButton}
+                                onPress={() => {
+                                    setMinimumPayment(formatWithThousandSeparator(calculatedPayment.toFixed(2)));
+                                    setIsMinPaymentManual(false);
+                                }}
+                            >
+                                <Text style={styles.useCalculatedText}>
+                                    Use calculated: {selectedCurrency.symbol}{calculatedPayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        {/* EMI calculation info */}
+                        {calculatedPayment !== null && calculatedPayment > 0 && !isMinPaymentManual && (
+                            <Text style={styles.emiInfo}>
+                                Monthly interest based on {interestRate}% APR
+                            </Text>
+                        )}
                     </View>
 
                     {/* Submit Button */}
@@ -433,11 +491,28 @@ const styles = StyleSheet.create({
     inputGroup: {
         marginBottom: 24,
     },
+    labelRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
     label: {
         fontSize: 14,
         fontWeight: '600',
         color: '#FFFFFF',
         marginBottom: 8,
+    },
+    labelInRow: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        marginBottom: 0,
+    },
+    calculatedHint: {
+        fontSize: 12,
+        color: '#34C759',
+        fontWeight: '500',
     },
     input: {
         backgroundColor: '#1C1C1E',
@@ -529,6 +604,25 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 17,
         fontWeight: '600',
+    },
+    useCalculatedButton: {
+        marginTop: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#007AFF20',
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+    },
+    useCalculatedText: {
+        fontSize: 13,
+        color: '#007AFF',
+        fontWeight: '500',
+    },
+    emiInfo: {
+        marginTop: 8,
+        fontSize: 12,
+        color: '#8E8E93',
+        fontStyle: 'italic',
     },
 });
 
