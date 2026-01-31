@@ -11,6 +11,7 @@ export type RootStackParamList = {
   AddDebt: undefined;
   DebtLedger: undefined;
   Settings: undefined;
+  EditProfile: undefined;
   Test: undefined;
   NotFound: undefined;
 };
