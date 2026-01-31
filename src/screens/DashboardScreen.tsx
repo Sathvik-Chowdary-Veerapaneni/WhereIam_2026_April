@@ -172,10 +172,18 @@ export const DashboardScreen: React.FC = () => {
                                 const currency = getCurrencyByCode(code);
                                 const totals = totalsByCurrency[code];
                                 return (
-                                    <View key={code} style={styles.currencyTotalCard}>
+                                    <TouchableOpacity
+                                        key={code}
+                                        style={styles.currencyTotalCard}
+                                        onPress={() => navigation.navigate('DebtLedger', { currencyCode: code })}
+                                        activeOpacity={0.7}
+                                    >
                                         <View style={styles.currencyTotalHeader}>
                                             <Text style={styles.currencyFlag}>{currency.flag}</Text>
                                             <Text style={styles.currencyCode}>{code}</Text>
+                                            <View style={styles.currencyEditBadge}>
+                                                <Text style={styles.currencyEditText}>View All ›</Text>
+                                            </View>
                                         </View>
                                         <Text style={styles.currencyTotalBalance}>
                                             {formatCurrencyAmount(totals.totalBalance, code)}
@@ -183,7 +191,7 @@ export const DashboardScreen: React.FC = () => {
                                         <Text style={styles.currencyTotalSubtext}>
                                             {totals.debtCount} debt{totals.debtCount > 1 ? 's' : ''} • Min: {formatCurrencyAmount(totals.totalMinPayment, code)}/mo
                                         </Text>
-                                    </View>
+                                    </TouchableOpacity>
                                 );
                             })}
                         </View>
@@ -459,13 +467,21 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 16,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: '#FF6B6B40',
     },
     currencyTotalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
         marginBottom: 8,
+    },
+    currencyEditBadge: {
+        marginLeft: 'auto',
+    },
+    currencyEditText: {
+        fontSize: 13,
+        color: '#007AFF',
+        fontWeight: '500',
     },
     currencyFlag: {
         fontSize: 24,

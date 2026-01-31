@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -12,7 +12,7 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { debtsService, CreateDebtInput } from '../services/debts';
@@ -21,6 +21,7 @@ import { CurrencySelector, CurrencyPickerButton } from '../components';
 import { Currency, getCurrencyByCode } from '../constants/currencies';
 
 type AddDebtNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddDebt'>;
+type AddDebtRouteProp = RouteProp<RootStackParamList, 'AddDebt'>;
 
 const DEBT_TYPES = [
     { id: 'credit_card', label: '💳 Credit Card' },
@@ -34,7 +35,12 @@ const DEBT_TYPES = [
 
 export const AddDebtScreen: React.FC = () => {
     const navigation = useNavigation<AddDebtNavigationProp>();
+    const route = useRoute<AddDebtRouteProp>();
+    const editDebtId = route.params?.debtId;
+    const isEditMode = !!editDebtId;
+
     const [loading, setLoading] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(isEditMode);
     const [showCurrencySelector, setShowCurrencySelector] = useState(false);
     const [selectedCurrencyCode, setSelectedCurrencyCode] = useState('USD');
 
@@ -47,6 +53,38 @@ export const AddDebtScreen: React.FC = () => {
     const [minimumPayment, setMinimumPayment] = useState('');
 
     const selectedCurrency = getCurrencyByCode(selectedCurrencyCode);
+
+    // Load existing debt data when editing
+    useEffect(() => {
+        if (editDebtId) {
+            loadDebtData();
+        }
+    }, [editDebtId]);
+
+    const loadDebtData = async () => {
+        try {
+            setInitialLoading(true);
+            const { success, debt, error } = await debtsService.getDebt(editDebtId!);
+            if (success && debt) {
+                setName(debt.name);
+                setDebtType(debt.debt_type);
+                setCreditorName(debt.creditor_name || '');
+                setSelectedCurrencyCode(debt.currency_code || 'USD');
+                setCurrentBalance(debt.current_balance?.toString() || '');
+                setInterestRate(debt.interest_rate?.toString() || '');
+                setMinimumPayment(debt.minimum_payment?.toString() || '');
+            } else {
+                Alert.alert('Error', 'Failed to load debt data');
+                navigation.goBack();
+            }
+        } catch (error) {
+            logger.error('Load debt error:', error);
+            Alert.alert('Error', 'Failed to load debt data');
+            navigation.goBack();
+        } finally {
+            setInitialLoading(false);
+        }
+    };
 
     // Extract raw numeric value from formatted string
     const extractNumber = (value: string): string => {
@@ -187,22 +225,41 @@ export const AddDebtScreen: React.FC = () => {
                 minimum_payment: minPay,
             };
 
-            const { success, error } = await debtsService.createDebt(input);
-
-            if (!success) {
-                throw error || new Error('Failed to create debt');
+            if (isEditMode) {
+                // Update existing debt
+                const { success, error } = await debtsService.updateDebt(editDebtId!, input);
+                if (!success) {
+                    throw error || new Error('Failed to update debt');
+                }
+                logger.info('Debt updated successfully');
+            } else {
+                // Create new debt
+                const { success, error } = await debtsService.createDebt(input);
+                if (!success) {
+                    throw error || new Error('Failed to create debt');
+                }
+                logger.info('Debt added successfully');
             }
 
-            logger.info('Debt added successfully');
             navigation.goBack();
         } catch (error) {
-            const message = (error as Error).message || 'Failed to add debt';
-            logger.error('Add debt error:', error);
+            const message = (error as Error).message || `Failed to ${isEditMode ? 'update' : 'add'} debt`;
+            logger.error(`${isEditMode ? 'Update' : 'Add'} debt error:`, error);
             Alert.alert('Error', message);
         } finally {
             setLoading(false);
         }
     };
+
+    if (initialLoading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -334,7 +391,9 @@ export const AddDebtScreen: React.FC = () => {
                         {loading ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <Text style={styles.submitButtonText}>Add Debt</Text>
+                            <Text style={styles.submitButtonText}>
+                                {isEditMode ? 'Update Debt' : 'Add Debt'}
+                            </Text>
                         )}
                     </TouchableOpacity>
                 </ScrollView>
@@ -355,6 +414,11 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#0A0A0F',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     keyboardView: {
         flex: 1,

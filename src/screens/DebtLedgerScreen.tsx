@@ -13,10 +13,15 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/types';
 import { debtsService, Debt } from '../services/debts';
 import { logger } from '../utils';
 import { formatCurrencyAmount, getCurrencyByCode } from '../constants/currencies';
+
+type DebtLedgerNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DebtLedger'>;
+type DebtLedgerRouteProp = RouteProp<RootStackParamList, 'DebtLedger'>;
 
 const DEBT_TYPE_ICONS: Record<string, string> = {
     credit_card: '💳',
@@ -45,6 +50,10 @@ interface CurrencyTotal {
 }
 
 export const DebtLedgerScreen: React.FC = () => {
+    const navigation = useNavigation<DebtLedgerNavigationProp>();
+    const route = useRoute<DebtLedgerRouteProp>();
+    const filterCurrency = route.params?.currencyCode;
+
     const [debts, setDebts] = useState<Debt[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -59,7 +68,11 @@ export const DebtLedgerScreen: React.FC = () => {
             ]);
 
             if (debtsResult.success && debtsResult.debts) {
-                setDebts(debtsResult.debts);
+                // Filter by currency if provided
+                const filteredDebts = filterCurrency
+                    ? debtsResult.debts.filter(d => (d.currency_code || 'USD') === filterCurrency)
+                    : debtsResult.debts;
+                setDebts(filteredDebts);
             }
 
             if (totalsResult.success) {
@@ -72,7 +85,11 @@ export const DebtLedgerScreen: React.FC = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [filterCurrency]);
+
+    const handleEditDebt = useCallback((debt: Debt) => {
+        navigation.navigate('AddDebt', { debtId: debt.id });
+    }, [navigation]);
 
     useFocusEffect(
         useCallback(() => {
@@ -253,27 +270,48 @@ export const DebtLedgerScreen: React.FC = () => {
                 >
                     {/* Summary Header - Totals by Currency */}
                     <View style={styles.summaryCard}>
-                        <View style={styles.summaryRow}>
-                            <View style={styles.summaryItem}>
-                                <Text style={styles.summaryLabel}>Total Debts</Text>
-                                <Text style={styles.summaryValue}>{totalDebts}</Text>
+                        {filterCurrency ? (
+                            // Filtered view - show only selected currency
+                            <View style={styles.filteredSummary}>
+                                <View style={styles.filteredHeader}>
+                                    <Text style={styles.filteredCurrencyFlag}>
+                                        {getCurrencyByCode(filterCurrency).flag}
+                                    </Text>
+                                    <Text style={styles.filteredCurrencyCode}>{filterCurrency} Debts</Text>
+                                </View>
+                                <Text style={styles.filteredTotal}>
+                                    {totalsByCurrency[filterCurrency]
+                                        ? formatCurrencyAmount(totalsByCurrency[filterCurrency].totalBalance, filterCurrency)
+                                        : formatCurrencyAmount(0, filterCurrency)}
+                                </Text>
+                                <Text style={styles.filteredCount}>
+                                    {debts.length} debt{debts.length !== 1 ? 's' : ''} • Tap to edit
+                                </Text>
                             </View>
-                            {sortedCurrencyCodes.map((code, index) => {
-                                const totals = totalsByCurrency[code];
-                                const currency = getCurrencyByCode(code);
-                                return (
-                                    <React.Fragment key={code}>
-                                        <View style={styles.summaryDivider} />
-                                        <View style={styles.summaryItem}>
-                                            <Text style={styles.summaryLabel}>{currency.flag} {code}</Text>
-                                            <Text style={[styles.summaryValue, styles.summaryValueRed]}>
-                                                {formatCurrencyAmount(totals.totalBalance, code)}
-                                            </Text>
-                                        </View>
-                                    </React.Fragment>
-                                );
-                            })}
-                        </View>
+                        ) : (
+                            // All debts view
+                            <View style={styles.summaryRow}>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryLabel}>Total Debts</Text>
+                                    <Text style={styles.summaryValue}>{totalDebts}</Text>
+                                </View>
+                                {sortedCurrencyCodes.map((code, index) => {
+                                    const totals = totalsByCurrency[code];
+                                    const currency = getCurrencyByCode(code);
+                                    return (
+                                        <React.Fragment key={code}>
+                                            <View style={styles.summaryDivider} />
+                                            <View style={styles.summaryItem}>
+                                                <Text style={styles.summaryLabel}>{currency.flag} {code}</Text>
+                                                <Text style={[styles.summaryValue, styles.summaryValueRed]}>
+                                                    {formatCurrencyAmount(totals.totalBalance, code)}
+                                                </Text>
+                                            </View>
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </View>
+                        )}
                     </View>
 
                     {/* Ledger Header */}
@@ -306,11 +344,13 @@ export const DebtLedgerScreen: React.FC = () => {
                                         overshootRight={false}
                                         friction={2}
                                     >
-                                        <View
+                                        <TouchableOpacity
                                             style={[
                                                 styles.ledgerRow,
                                                 index === debts.length - 1 && styles.ledgerRowLast,
                                             ]}
+                                            onPress={() => handleEditDebt(debt)}
+                                            activeOpacity={0.7}
                                         >
                                             <View style={styles.ledgerDebtInfo}>
                                                 <View style={styles.ledgerIcon}>
@@ -342,26 +382,41 @@ export const DebtLedgerScreen: React.FC = () => {
                                                     </Text>
                                                 )}
                                             </View>
-                                        </View>
+                                        </TouchableOpacity>
                                     </Swipeable>
                                 );
                             })}
 
                             {/* Ledger Footer / Totals by Currency */}
-                            {sortedCurrencyCodes.map((code) => {
-                                const totals = totalsByCurrency[code];
-                                const currency = getCurrencyByCode(code);
-                                return (
-                                    <View key={code} style={styles.ledgerFooter}>
+                            {filterCurrency ? (
+                                // Show only filtered currency total
+                                totalsByCurrency[filterCurrency] && (
+                                    <View style={styles.ledgerFooter}>
                                         <Text style={styles.ledgerFooterLabel}>
-                                            {currency.flag} Total {code}
+                                            {getCurrencyByCode(filterCurrency).flag} Total {filterCurrency}
                                         </Text>
                                         <Text style={styles.ledgerFooterValue}>
-                                            {formatCurrencyAmount(totals.totalBalance, code)}
+                                            {formatCurrencyAmount(totalsByCurrency[filterCurrency].totalBalance, filterCurrency)}
                                         </Text>
                                     </View>
-                                );
-                            })}
+                                )
+                            ) : (
+                                // Show all currency totals
+                                sortedCurrencyCodes.map((code) => {
+                                    const totals = totalsByCurrency[code];
+                                    const currency = getCurrencyByCode(code);
+                                    return (
+                                        <View key={code} style={styles.ledgerFooter}>
+                                            <Text style={styles.ledgerFooterLabel}>
+                                                {currency.flag} Total {code}
+                                            </Text>
+                                            <Text style={styles.ledgerFooterValue}>
+                                                {formatCurrencyAmount(totals.totalBalance, code)}
+                                            </Text>
+                                        </View>
+                                    );
+                                })
+                            )}
                         </View>
                     ) : (
                         <View style={styles.emptyState}>
@@ -376,7 +431,7 @@ export const DebtLedgerScreen: React.FC = () => {
                     {/* Footer Info */}
                     {debts.length > 0 && (
                         <Text style={styles.footerNote}>
-                            Swipe left on a debt to delete it
+                            Tap to edit • Swipe left to delete
                         </Text>
                     )}
                 </ScrollView>
@@ -435,6 +490,34 @@ const styles = StyleSheet.create({
     },
     summaryValueRed: {
         color: '#FF3B30',
+    },
+    filteredSummary: {
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    filteredHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
+    },
+    filteredCurrencyFlag: {
+        fontSize: 28,
+    },
+    filteredCurrencyCode: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    filteredTotal: {
+        fontSize: 32,
+        fontWeight: '700',
+        color: '#FF3B30',
+        marginBottom: 4,
+    },
+    filteredCount: {
+        fontSize: 14,
+        color: '#8E8E93',
     },
     ledgerHeader: {
         flexDirection: 'row',

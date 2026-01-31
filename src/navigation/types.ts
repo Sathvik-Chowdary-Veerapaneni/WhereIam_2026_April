@@ -8,8 +8,8 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Home: undefined;
   Dashboard: undefined;
-  AddDebt: undefined;
-  DebtLedger: undefined;
+  AddDebt: { debtId?: string } | undefined;
+  DebtLedger: { currencyCode?: string } | undefined;
   Settings: undefined;
   EditProfile: undefined;
   Test: undefined;
