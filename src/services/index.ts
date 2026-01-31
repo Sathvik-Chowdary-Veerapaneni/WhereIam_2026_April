@@ -5,4 +5,5 @@ export { analyticsService } from './analytics';
 export { plaidService } from './plaid';
 export { revenueCatService } from './revenueCat';
 export { debtsService } from './debts';
+export { incomeService } from './incomeService';
 

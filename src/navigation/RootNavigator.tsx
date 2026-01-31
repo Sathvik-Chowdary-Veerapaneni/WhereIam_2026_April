@@ -14,6 +14,7 @@ import {
   HomeScreen,
   NotFoundScreen,
   TestScreen,
+  EditProfileScreen,
 } from '../screens';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -117,6 +118,14 @@ export const RootNavigator: React.FC = () => {
               name="Test"
               component={TestScreen}
               options={{ title: 'Test' }}
+            />
+            <Stack.Screen
+              name="EditProfile"
+              component={EditProfileScreen}
+              options={{
+                title: 'Income & Profession',
+                presentation: 'card',
+              }}
             />
           </>
         )}

@@ -8,3 +8,4 @@ export { DashboardScreen } from './DashboardScreen';
 export { SettingsScreen } from './SettingsScreen';
 export { AddDebtScreen } from './AddDebtScreen';
 export { DebtLedgerScreen } from './DebtLedgerScreen';
+export { EditProfileScreen } from './EditProfileScreen';

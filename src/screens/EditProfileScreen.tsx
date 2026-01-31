@@ -1,0 +1,667 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    SafeAreaView,
+    ScrollView,
+    TouchableOpacity,
+    TextInput,
+    Alert,
+    ActivityIndicator,
+    Modal,
+    KeyboardAvoidingView,
+    Platform,
+} from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../context';
+import { incomeService, IncomeSource, CreateIncomeInput } from '../services/incomeService';
+import { logger } from '../utils';
+
+const PROFESSIONS = [
+    { id: 'rideshare', label: '🚗 Rideshare Driver', value: 'rideshare' },
+    { id: 'delivery', label: '📦 Delivery Driver', value: 'delivery' },
+    { id: 'freelance', label: '💻 Freelancer', value: 'freelance' },
+    { id: 'retail', label: '🛍️ Retail Worker', value: 'retail' },
+    { id: 'healthcare', label: '🏥 Healthcare', value: 'healthcare' },
+    { id: 'food_service', label: '🍽️ Food Service', value: 'food_service' },
+    { id: 'construction', label: '🔨 Construction', value: 'construction' },
+    { id: 'other', label: '💼 Other', value: 'other' },
+];
+
+const INCOME_TYPES = [
+    { id: 'primary', label: '💼 Primary Job', value: 'primary', color: '#007AFF' },
+    { id: 'side_gig', label: '🌙 Side Gig', value: 'side_gig', color: '#5856D6' },
+    { id: 'cash_earnings', label: '💵 Cash Earnings', value: 'cash_earnings', color: '#34C759' },
+    { id: 'other', label: '📊 Other Income', value: 'other', color: '#FF9500' },
+];
+
+const getProfessionLabel = (value: string): string => {
+    const profession = PROFESSIONS.find(p => p.value === value);
+    return profession?.label || value;
+};
+
+const getIncomeTypeInfo = (type: string) => {
+    return INCOME_TYPES.find(t => t.value === type) || INCOME_TYPES[3];
+};
+
+export const EditProfileScreen: React.FC = () => {
+    const navigation = useNavigation();
+    const { user } = useAuth();
+    const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
+
+    // Form state
+    const [formProfession, setFormProfession] = useState<string>('');
+    const [formAmount, setFormAmount] = useState<string>('');
+    const [formType, setFormType] = useState<string>('primary');
+    const [formDescription, setFormDescription] = useState<string>('');
+
+    const loadIncomeSources = useCallback(async () => {
+        if (!user) return;
+
+        try {
+            setLoading(true);
+            const sources = await incomeService.getAll(user.id);
+            setIncomeSources(sources);
+        } catch (error) {
+            logger.error('Error loading income sources:', error);
+            Alert.alert('Error', 'Failed to load income sources');
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadIncomeSources();
+        }, [loadIncomeSources])
+    );
+
+    const formatCurrency = (value: string): string => {
+        const cleaned = value.replace(/[^0-9.]/g, '');
+        const parts = cleaned.split('.');
+        if (parts.length > 2) {
+            return parts[0] + '.' + parts.slice(1).join('');
+        }
+        return cleaned;
+    };
+
+    const openAddModal = () => {
+        setEditingSource(null);
+        setFormProfession('');
+        setFormAmount('');
+        setFormType('primary');
+        setFormDescription('');
+        setModalVisible(true);
+    };
+
+    const openEditModal = (source: IncomeSource) => {
+        setEditingSource(source);
+        setFormProfession(source.profession);
+        setFormAmount(source.monthly_amount.toString());
+        setFormType(source.income_type || 'primary');
+        setFormDescription(source.description || '');
+        setModalVisible(true);
+    };
+
+    const handleSave = async () => {
+        if (!formProfession) {
+            Alert.alert('Error', 'Please select a profession');
+            return;
+        }
+
+        const amount = parseFloat(formAmount);
+        if (!formAmount || isNaN(amount) || amount <= 0) {
+            Alert.alert('Error', 'Please enter a valid monthly amount');
+            return;
+        }
+
+        if (!user) {
+            Alert.alert('Error', 'User not found');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            if (editingSource) {
+                // Update existing
+                await incomeService.update(editingSource.id, {
+                    profession: formProfession,
+                    monthly_amount: amount,
+                    income_type: formType as CreateIncomeInput['income_type'],
+                    description: formDescription || undefined,
+                });
+                logger.info('Income source updated');
+            } else {
+                // Create new
+                await incomeService.create(user.id, {
+                    profession: formProfession,
+                    monthly_amount: amount,
+                    income_type: formType as CreateIncomeInput['income_type'],
+                    description: formDescription || undefined,
+                });
+                logger.info('Income source created');
+            }
+
+            setModalVisible(false);
+            await loadIncomeSources();
+        } catch (error) {
+            logger.error('Error saving income source:', error);
+            Alert.alert('Error', 'Failed to save income source');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = (source: IncomeSource) => {
+        // Don't allow deleting the last income source
+        if (incomeSources.length <= 1) {
+            Alert.alert('Cannot Delete', 'You must have at least one income source.');
+            return;
+        }
+
+        Alert.alert(
+            'Delete Income Source',
+            `Are you sure you want to delete this ${getIncomeTypeInfo(source.income_type).label.split(' ')[1]} income?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await incomeService.delete(source.id);
+                            logger.info('Income source deleted');
+                            await loadIncomeSources();
+                        } catch (error) {
+                            logger.error('Error deleting income source:', error);
+                            Alert.alert('Error', 'Failed to delete income source');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const totalMonthlyIncome = incomeSources.reduce(
+        (sum, source) => sum + source.monthly_amount,
+        0
+    );
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {/* Summary Card */}
+                <View style={styles.summaryCard}>
+                    <Text style={styles.summaryLabel}>Total Monthly Income</Text>
+                    <Text style={styles.summaryAmount}>
+                        ${totalMonthlyIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                    <Text style={styles.summarySubtext}>
+                        {incomeSources.length} income source{incomeSources.length !== 1 ? 's' : ''}
+                    </Text>
+                </View>
+
+                {/* Income Sources List */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Income Sources</Text>
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={openAddModal}
+                        >
+                            <Text style={styles.addButtonText}>+ Add</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {incomeSources.map((source) => {
+                        const typeInfo = getIncomeTypeInfo(source.income_type);
+                        return (
+                            <TouchableOpacity
+                                key={source.id}
+                                style={styles.incomeCard}
+                                onPress={() => openEditModal(source)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.incomeCardHeader}>
+                                    <View style={[styles.typeBadge, { backgroundColor: typeInfo.color + '20' }]}>
+                                        <Text style={[styles.typeBadgeText, { color: typeInfo.color }]}>
+                                            {typeInfo.label}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.deleteButton}
+                                        onPress={() => handleDelete(source)}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    >
+                                        <Text style={styles.deleteButtonText}>✕</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={styles.professionText}>
+                                    {getProfessionLabel(source.profession)}
+                                </Text>
+
+                                <Text style={styles.amountText}>
+                                    ${source.monthly_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    <Text style={styles.perMonthText}> / month</Text>
+                                </Text>
+
+                                {source.description && (
+                                    <Text style={styles.descriptionText}>
+                                        {source.description}
+                                    </Text>
+                                )}
+
+                                <Text style={styles.editHint}>Tap to edit</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </ScrollView>
+
+            {/* Add/Edit Modal */}
+            <Modal
+                visible={modalVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalContainer}
+                >
+                    <SafeAreaView style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <TouchableOpacity
+                                onPress={() => setModalVisible(false)}
+                                style={styles.modalCloseButton}
+                            >
+                                <Text style={styles.modalCloseText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.modalTitle}>
+                                {editingSource ? 'Edit Income' : 'Add Income'}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={handleSave}
+                                style={styles.modalSaveButton}
+                                disabled={saving}
+                            >
+                                {saving ? (
+                                    <ActivityIndicator size="small" color="#007AFF" />
+                                ) : (
+                                    <Text style={styles.modalSaveText}>Save</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.modalScrollView}>
+                            {/* Income Type Selection */}
+                            <View style={styles.formSection}>
+                                <Text style={styles.formLabel}>Income Type</Text>
+                                <View style={styles.typeGrid}>
+                                    {INCOME_TYPES.map((type) => (
+                                        <TouchableOpacity
+                                            key={type.id}
+                                            style={[
+                                                styles.typeButton,
+                                                formType === type.value && {
+                                                    backgroundColor: type.color + '20',
+                                                    borderColor: type.color,
+                                                },
+                                            ]}
+                                            onPress={() => setFormType(type.value)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.typeButtonText,
+                                                    formType === type.value && { color: type.color },
+                                                ]}
+                                            >
+                                                {type.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+
+                            {/* Profession Selection */}
+                            <View style={styles.formSection}>
+                                <Text style={styles.formLabel}>Profession</Text>
+                                <View style={styles.professionGrid}>
+                                    {PROFESSIONS.map((item) => (
+                                        <TouchableOpacity
+                                            key={item.id}
+                                            style={[
+                                                styles.professionButton,
+                                                formProfession === item.value && styles.professionSelected,
+                                            ]}
+                                            onPress={() => setFormProfession(item.value)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.professionButtonText,
+                                                    formProfession === item.value && styles.professionTextSelected,
+                                                ]}
+                                            >
+                                                {item.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+
+                            {/* Monthly Amount */}
+                            <View style={styles.formSection}>
+                                <Text style={styles.formLabel}>Monthly Amount</Text>
+                                <View style={styles.amountInputContainer}>
+                                    <Text style={styles.currencySymbol}>$</Text>
+                                    <TextInput
+                                        style={styles.amountInput}
+                                        placeholder="0.00"
+                                        placeholderTextColor="#666"
+                                        keyboardType="decimal-pad"
+                                        value={formAmount}
+                                        onChangeText={(text) => setFormAmount(formatCurrency(text))}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Description (Optional) */}
+                            <View style={styles.formSection}>
+                                <Text style={styles.formLabel}>Description (Optional)</Text>
+                                <TextInput
+                                    style={styles.descriptionInput}
+                                    placeholder="e.g., Uber driving on weekends"
+                                    placeholderTextColor="#666"
+                                    value={formDescription}
+                                    onChangeText={setFormDescription}
+                                    multiline
+                                    numberOfLines={2}
+                                />
+                            </View>
+                        </ScrollView>
+                    </SafeAreaView>
+                </KeyboardAvoidingView>
+            </Modal>
+        </SafeAreaView>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#0A0A0F',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        padding: 20,
+        paddingBottom: 40,
+    },
+    summaryCard: {
+        backgroundColor: '#1C1C1E',
+        borderRadius: 16,
+        padding: 24,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#007AFF30',
+        marginBottom: 24,
+    },
+    summaryLabel: {
+        fontSize: 14,
+        color: '#8E8E93',
+        marginBottom: 8,
+    },
+    summaryAmount: {
+        fontSize: 36,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: 4,
+    },
+    summarySubtext: {
+        fontSize: 14,
+        color: '#8E8E93',
+    },
+    section: {
+        marginBottom: 24,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    addButton: {
+        backgroundColor: '#007AFF20',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#007AFF40',
+    },
+    addButtonText: {
+        color: '#007AFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    incomeCard: {
+        backgroundColor: '#1C1C1E',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+    },
+    incomeCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    typeBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    typeBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    deleteButton: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#FF3B3020',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    deleteButtonText: {
+        color: '#FF3B30',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    professionText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        marginBottom: 8,
+    },
+    amountText: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#34C759',
+    },
+    perMonthText: {
+        fontSize: 14,
+        fontWeight: '400',
+        color: '#8E8E93',
+    },
+    descriptionText: {
+        fontSize: 14,
+        color: '#8E8E93',
+        marginTop: 8,
+        fontStyle: 'italic',
+    },
+    editHint: {
+        fontSize: 12,
+        color: '#5E5E60',
+        marginTop: 12,
+        textAlign: 'right',
+    },
+    // Modal Styles
+    modalContainer: {
+        flex: 1,
+        backgroundColor: '#0A0A0F',
+    },
+    modalContent: {
+        flex: 1,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#2C2C2E',
+    },
+    modalCloseButton: {
+        minWidth: 60,
+    },
+    modalCloseText: {
+        color: '#8E8E93',
+        fontSize: 16,
+    },
+    modalTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    modalSaveButton: {
+        minWidth: 60,
+        alignItems: 'flex-end',
+    },
+    modalSaveText: {
+        color: '#007AFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalScrollView: {
+        flex: 1,
+        padding: 20,
+    },
+    formSection: {
+        marginBottom: 28,
+    },
+    formLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#8E8E93',
+        marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    typeGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    typeButton: {
+        backgroundColor: '#1C1C1E',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+    },
+    typeButtonText: {
+        fontSize: 14,
+        color: '#FFFFFF',
+    },
+    professionGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    professionButton: {
+        backgroundColor: '#1C1C1E',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+    },
+    professionSelected: {
+        backgroundColor: '#0A3D62',
+        borderColor: '#007AFF',
+    },
+    professionButtonText: {
+        fontSize: 14,
+        color: '#FFFFFF',
+    },
+    professionTextSelected: {
+        color: '#007AFF',
+        fontWeight: '600',
+    },
+    amountInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1C1C1E',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+        paddingHorizontal: 16,
+    },
+    currencySymbol: {
+        fontSize: 24,
+        fontWeight: '600',
+        color: '#8E8E93',
+        marginRight: 8,
+    },
+    amountInput: {
+        flex: 1,
+        fontSize: 24,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        paddingVertical: 16,
+    },
+    descriptionInput: {
+        backgroundColor: '#1C1C1E',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+        padding: 16,
+        fontSize: 16,
+        color: '#FFFFFF',
+        minHeight: 80,
+        textAlignVertical: 'top',
+    },
+});
