@@ -139,6 +139,26 @@ export const debtsService = {
         }
     },
 
+    // Get a single debt by ID
+    async getDebt(id: string): Promise<{ success: boolean; debt?: Debt; error?: Error }> {
+        try {
+            const { data, error } = await supabase
+                .from('debts')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (error) {
+                throw error;
+            }
+
+            return { success: true, debt: data };
+        } catch (error) {
+            logger.error('Get debt error:', error);
+            return { success: false, error: error as Error };
+        }
+    },
+
     // Update a debt
     async updateDebt(id: string, updates: Partial<CreateDebtInput>): Promise<{ success: boolean; error?: Error }> {
         try {

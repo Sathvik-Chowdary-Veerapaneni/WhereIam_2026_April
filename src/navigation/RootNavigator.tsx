@@ -96,18 +96,20 @@ export const RootNavigator: React.FC = () => {
             <Stack.Screen
               name="AddDebt"
               component={AddDebtScreen}
-              options={{
-                title: 'Add Debt',
+              options={({ route }) => ({
+                title: route.params?.debtId ? 'Edit Debt' : 'Add Debt',
                 presentation: 'card',
-              }}
+              })}
             />
             <Stack.Screen
               name="DebtLedger"
               component={DebtLedgerScreen}
-              options={{
-                title: 'Debts List',
+              options={({ route }) => ({
+                title: route.params?.currencyCode
+                  ? `${route.params.currencyCode} Debts`
+                  : 'Debts List',
                 presentation: 'card',
-              }}
+              })}
             />
             <Stack.Screen
               name="Home"
