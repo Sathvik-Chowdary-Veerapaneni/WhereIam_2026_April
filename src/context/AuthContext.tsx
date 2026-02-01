@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, authService } from '../services';
+import { supabase, authService, localStorageService } from '../services';
+import type { GuestSession } from '../services';
 import { logger } from '../utils';
 
 interface AuthContextType {
@@ -9,8 +10,14 @@ interface AuthContextType {
     isLoading: boolean;
     isOnboarded: boolean;
     isAdmin: boolean;
+    isGuest: boolean;
+    guestSession: GuestSession | null;
+    guestDaysRemaining: number;
     signOut: () => Promise<void>;
     checkOnboardingStatus: () => Promise<boolean>;
+    startGuestSession: () => Promise<void>;
+    endGuestSession: () => Promise<void>;
+    refreshGuestStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,6 +32,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isOnboarded, setIsOnboarded] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isGuest, setIsGuest] = useState(false);
+    const [guestSession, setGuestSession] = useState<GuestSession | null>(null);
+    const [guestDaysRemaining, setGuestDaysRemaining] = useState(0);
 
     // Check if user is admin
     const checkAdminStatus = async (userId: string): Promise<boolean> => {
@@ -55,6 +65,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Check if user has completed onboarding (has income entry)
     const checkOnboardingStatus = async (): Promise<boolean> => {
+        // For guest users, check local storage
+        if (isGuest) {
+            try {
+                const localIncome = await localStorageService.getLocalIncome();
+                const onboarded = localIncome.length > 0;
+                setIsOnboarded(onboarded);
+                return onboarded;
+            } catch (error) {
+                logger.error('Error checking guest onboarding status:', error);
+                return false;
+            }
+        }
+
+        // For authenticated users, check Supabase
         if (!user) return false;
 
         try {
@@ -78,15 +102,87 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    // Start a guest session
+    const startGuestSession = async () => {
+        try {
+            const session = await localStorageService.createGuestSession();
+            setGuestSession(session);
+            setIsGuest(true);
+            setIsOnboarded(false);
+
+            const daysRemaining = await localStorageService.getDaysRemaining();
+            setGuestDaysRemaining(daysRemaining);
+
+            logger.info('Guest session started');
+        } catch (error) {
+            logger.error('Failed to start guest session:', error);
+            throw error;
+        }
+    };
+
+    // End guest session (when user signs up or session expires)
+    const endGuestSession = async () => {
+        try {
+            await localStorageService.clearGuestSession();
+            setGuestSession(null);
+            setIsGuest(false);
+            setGuestDaysRemaining(0);
+            logger.info('Guest session ended');
+        } catch (error) {
+            logger.error('Failed to end guest session:', error);
+            throw error;
+        }
+    };
+
+    // Refresh guest session status
+    const refreshGuestStatus = useCallback(async () => {
+        try {
+            const existingSession = await localStorageService.getGuestSession();
+
+            if (existingSession) {
+                const isExpired = await localStorageService.isGuestSessionExpired();
+
+                if (isExpired) {
+                    logger.info('Guest session has expired');
+                    await localStorageService.clearGuestSession();
+                    setGuestSession(null);
+                    setIsGuest(false);
+                    setGuestDaysRemaining(0);
+                } else {
+                    setGuestSession(existingSession);
+                    setIsGuest(true);
+                    const daysRemaining = await localStorageService.getDaysRemaining();
+                    setGuestDaysRemaining(daysRemaining);
+
+                    // Check guest onboarding
+                    const localIncome = await localStorageService.getLocalIncome();
+                    setIsOnboarded(localIncome.length > 0);
+                }
+            }
+        } catch (error) {
+            logger.error('Error refreshing guest status:', error);
+        }
+    }, []);
+
     // Sign out handler
     const signOut = async () => {
         try {
-            const { success, error } = await authService.signOut();
-            if (!success) throw error;
+            if (isGuest) {
+                // If guest, just end the guest session
+                await endGuestSession();
+            } else {
+                // If authenticated, sign out from Supabase
+                const { success, error } = await authService.signOut();
+                if (!success) throw error;
+            }
+
             setSession(null);
             setUser(null);
             setIsOnboarded(false);
             setIsAdmin(false);
+            setIsGuest(false);
+            setGuestSession(null);
+            setGuestDaysRemaining(0);
             logger.info('User signed out');
         } catch (error) {
             logger.error('Sign out error:', error);
@@ -98,13 +194,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Get initial session
         const initSession = async () => {
             try {
+                // First check for authenticated session
                 const { data: { session } } = await supabase.auth.getSession();
-                setSession(session);
-                setUser(session?.user ?? null);
 
-                if (session?.user) {
+                if (session) {
+                    // User is authenticated
+                    setSession(session);
+                    setUser(session.user);
+                    setIsGuest(false);
+
                     await checkAdminStatus(session.user.id);
-                    await checkOnboardingStatus();
+
+                    // Check onboarding after setting user
+                    const { data, error } = await supabase
+                        .from('income')
+                        .select('id')
+                        .eq('user_id', session.user.id)
+                        .limit(1);
+
+                    if (!error) {
+                        setIsOnboarded(data && data.length > 0);
+                    }
+
+                    // Clear any guest session since user is now authenticated
+                    const guestExists = await localStorageService.getGuestSession();
+                    if (guestExists) {
+                        await localStorageService.clearGuestSession();
+                    }
+                } else {
+                    // No authenticated session, check for guest session
+                    await refreshGuestStatus();
                 }
             } catch (error) {
                 logger.error('Session init error:', error);
@@ -123,6 +242,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
+                    // User signed in - end guest mode if active
+                    if (isGuest) {
+                        // Note: We don't clear guest data here in case user wants to migrate it
+                        setIsGuest(false);
+                        setGuestSession(null);
+                    }
+
                     // Small delay to ensure DB trigger has run for new users
                     setTimeout(async () => {
                         await checkAdminStatus(session.user.id);
@@ -131,6 +257,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 } else {
                     setIsOnboarded(false);
                     setIsAdmin(false);
+                    // Check for guest session when user signs out
+                    await refreshGuestStatus();
                 }
             }
         );
@@ -140,13 +268,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
     }, []);
 
-    // Re-check onboarding when user changes
+    // Re-check onboarding when user or guest status changes
     useEffect(() => {
         if (user) {
             checkAdminStatus(user.id);
             checkOnboardingStatus();
+        } else if (isGuest) {
+            checkOnboardingStatus();
         }
-    }, [user?.id]);
+    }, [user?.id, isGuest]);
 
     return (
         <AuthContext.Provider
@@ -156,8 +286,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 isLoading,
                 isOnboarded,
                 isAdmin,
+                isGuest,
+                guestSession,
+                guestDaysRemaining,
                 signOut,
                 checkOnboardingStatus,
+                startGuestSession,
+                endGuestSession,
+                refreshGuestStatus,
             }}
         >
             {children}
