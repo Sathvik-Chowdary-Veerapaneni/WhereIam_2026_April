@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
@@ -27,12 +27,24 @@ const LoadingScreen = () => (
   </View>
 );
 
+// Guest banner component
+const GuestBanner: React.FC<{ daysRemaining: number }> = ({ daysRemaining }) => (
+  <View style={styles.guestBanner}>
+    <Text style={styles.guestBannerText}>
+      Guest Mode • {daysRemaining} days remaining
+    </Text>
+  </View>
+);
+
 export const RootNavigator: React.FC = () => {
-  const { session, isLoading, isOnboarded } = useAuth();
+  const { session, isLoading, isOnboarded, isGuest, guestDaysRemaining } = useAuth();
 
   if (isLoading) {
     return <LoadingScreen />;
   }
+
+  // User is authenticated (has session) OR is in guest mode
+  const isAuthenticated = session !== null || isGuest;
 
   return (
     <NavigationContainer>
@@ -52,8 +64,8 @@ export const RootNavigator: React.FC = () => {
           },
         }}
       >
-        {!session ? (
-          // Auth Stack - User not signed in
+        {!isAuthenticated ? (
+          // Auth Stack - User not signed in and not in guest mode
           <>
             <Stack.Screen
               name="Auth"
@@ -65,7 +77,7 @@ export const RootNavigator: React.FC = () => {
             />
           </>
         ) : !isOnboarded ? (
-          // Onboarding Stack - User signed in but not onboarded
+          // Onboarding Stack - User signed in/guest but not onboarded
           <>
             <Stack.Screen
               name="Onboarding"
@@ -77,7 +89,7 @@ export const RootNavigator: React.FC = () => {
             />
           </>
         ) : (
-          // App Stack - User signed in and onboarded
+          // App Stack - User signed in/guest and onboarded
           <>
             <Stack.Screen
               name="Dashboard"
@@ -160,5 +172,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#0A0A0F',
+  },
+  guestBanner: {
+    backgroundColor: '#FF9500',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  guestBannerText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
