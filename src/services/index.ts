@@ -8,4 +8,6 @@ export { debtsService } from './debts';
 export { incomeService } from './incomeService';
 export { debtTransactionsService } from './debtTransactions';
 export type { DebtTransaction, CreateTransactionInput } from './debtTransactions';
+export { localStorageService } from './localStorage';
+export type { GuestSession, LocalDebt, LocalIncome, LocalTransaction } from './localStorage';
 
