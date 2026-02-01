@@ -22,6 +22,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { debtsService, Debt } from '../services/debts';
 import { debtTransactionsService, DebtTransaction } from '../services/debtTransactions';
+import { localStorageService } from '../services';
+import { useAuth } from '../context';
 import { logger } from '../utils';
 import { formatCurrencyAmount, getCurrencyByCode } from '../constants/currencies';
 
@@ -57,6 +59,7 @@ interface CurrencyTotal {
 export const DebtLedgerScreen: React.FC = () => {
     const navigation = useNavigation<DebtLedgerNavigationProp>();
     const route = useRoute<DebtLedgerRouteProp>();
+    const { isGuest } = useAuth();
     const filterCurrency = route.params?.currencyCode;
 
     const [debts, setDebts] = useState<Debt[]>([]);
@@ -80,21 +83,53 @@ export const DebtLedgerScreen: React.FC = () => {
 
     const fetchData = useCallback(async () => {
         try {
-            const [debtsResult, totalsResult] = await Promise.all([
-                debtsService.listDebts(),
-                debtsService.getDebtTotalsByCurrency(),
-            ]);
+            if (isGuest) {
+                // Fetch from local storage for guest users
+                const localDebts = await localStorageService.getLocalDebts();
+                const formattedDebts: Debt[] = localDebts.map(d => ({
+                    ...d,
+                    user_id: 'guest',
+                }));
 
-            if (debtsResult.success && debtsResult.debts) {
                 const filteredDebts = filterCurrency
-                    ? debtsResult.debts.filter(d => (d.currency_code || 'USD') === filterCurrency)
-                    : debtsResult.debts;
+                    ? formattedDebts.filter(d => (d.currency_code || 'USD') === filterCurrency)
+                    : formattedDebts;
                 setDebts(filteredDebts);
-            }
 
-            if (totalsResult.success) {
-                setTotalsByCurrency(totalsResult.totalsByCurrency || {});
-                setTotalDebts(totalsResult.totalDebts || 0);
+                // Calculate totals by currency
+                const activeDebts = localDebts.filter(d => d.status === 'active');
+                const totals: { [currencyCode: string]: CurrencyTotal } = {};
+
+                for (const debt of activeDebts) {
+                    const currencyCode = debt.currency_code || 'USD';
+                    if (!totals[currencyCode]) {
+                        totals[currencyCode] = { totalBalance: 0, totalMinPayment: 0, debtCount: 0 };
+                    }
+                    totals[currencyCode].totalBalance += debt.current_balance || 0;
+                    totals[currencyCode].totalMinPayment += debt.minimum_payment || 0;
+                    totals[currencyCode].debtCount += 1;
+                }
+
+                setTotalsByCurrency(totals);
+                setTotalDebts(activeDebts.length);
+            } else {
+                // Fetch from Supabase for authenticated users
+                const [debtsResult, totalsResult] = await Promise.all([
+                    debtsService.listDebts(),
+                    debtsService.getDebtTotalsByCurrency(),
+                ]);
+
+                if (debtsResult.success && debtsResult.debts) {
+                    const filteredDebts = filterCurrency
+                        ? debtsResult.debts.filter(d => (d.currency_code || 'USD') === filterCurrency)
+                        : debtsResult.debts;
+                    setDebts(filteredDebts);
+                }
+
+                if (totalsResult.success) {
+                    setTotalsByCurrency(totalsResult.totalsByCurrency || {});
+                    setTotalDebts(totalsResult.totalDebts || 0);
+                }
             }
         } catch (error) {
             logger.error('Debt ledger fetch error:', error);
@@ -102,21 +137,32 @@ export const DebtLedgerScreen: React.FC = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [filterCurrency]);
+    }, [filterCurrency, isGuest]);
 
     const fetchTransactions = useCallback(async (debtId: string) => {
         setLoadingTransactions(debtId);
         try {
-            const result = await debtTransactionsService.getTransactionsByDebt(debtId);
-            if (result.success && result.transactions) {
-                setTransactions(prev => ({ ...prev, [debtId]: result.transactions! }));
+            if (isGuest) {
+                // Fetch from local storage for guest users
+                const localTxns = await localStorageService.getLocalTransactionsForDebt(debtId);
+                const formattedTxns: DebtTransaction[] = localTxns.map(t => ({
+                    ...t,
+                    user_id: 'guest',
+                }));
+                setTransactions(prev => ({ ...prev, [debtId]: formattedTxns }));
+            } else {
+                // Fetch from Supabase for authenticated users
+                const result = await debtTransactionsService.getTransactionsByDebt(debtId);
+                if (result.success && result.transactions) {
+                    setTransactions(prev => ({ ...prev, [debtId]: result.transactions! }));
+                }
             }
         } catch (error) {
             logger.error('Fetch transactions error:', error);
         } finally {
             setLoadingTransactions(null);
         }
-    }, []);
+    }, [isGuest]);
 
     const handleToggleExpand = useCallback((debt: Debt) => {
         if (expandedDebtId === debt.id) {
@@ -152,20 +198,48 @@ export const DebtLedgerScreen: React.FC = () => {
 
         setSavingTransaction(true);
         try {
-            const result = await debtTransactionsService.createTransaction({
-                debt_id: transactionDebt.id,
-                type: transactionType,
-                amount,
-                notes: transactionNotes || undefined,
-            });
+            if (isGuest) {
+                // Save to local storage for guest users
+                const currentBalance = transactionDebt.current_balance || 0;
+                const newBalance = transactionType === 'payment'
+                    ? currentBalance - amount
+                    : currentBalance + amount;
 
-            if (result.success) {
+                // Save transaction
+                await localStorageService.saveLocalTransaction({
+                    debt_id: transactionDebt.id,
+                    type: transactionType,
+                    amount,
+                    interest_amount: 0,
+                    new_balance: Math.max(0, newBalance),
+                    notes: transactionNotes || undefined,
+                });
+
+                // Update debt balance
+                await localStorageService.updateLocalDebt(transactionDebt.id, {
+                    current_balance: Math.max(0, newBalance),
+                });
+
                 setTransactionModalVisible(false);
-                // Refresh data
                 await fetchData();
                 await fetchTransactions(transactionDebt.id);
+                logger.info('Local transaction saved');
             } else {
-                throw result.error || new Error('Failed to save transaction');
+                // Save to Supabase for authenticated users
+                const result = await debtTransactionsService.createTransaction({
+                    debt_id: transactionDebt.id,
+                    type: transactionType,
+                    amount,
+                    notes: transactionNotes || undefined,
+                });
+
+                if (result.success) {
+                    setTransactionModalVisible(false);
+                    await fetchData();
+                    await fetchTransactions(transactionDebt.id);
+                } else {
+                    throw result.error || new Error('Failed to save transaction');
+                }
             }
         } catch (error) {
             logger.error('Save transaction error:', error);
@@ -173,7 +247,7 @@ export const DebtLedgerScreen: React.FC = () => {
         } finally {
             setSavingTransaction(false);
         }
-    }, [transactionDebt, transactionType, transactionAmount, transactionNotes, fetchData, fetchTransactions]);
+    }, [transactionDebt, transactionType, transactionAmount, transactionNotes, fetchData, fetchTransactions, isGuest]);
 
     useFocusEffect(
         useCallback(() => {
