@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Config } from '../constants/config';
+import { logger } from '../utils';
 
 // Initialize Supabase client
 export const supabase = createClient(Config.supabase.url, Config.supabase.anonKey);
@@ -24,6 +25,53 @@ export const authService = {
       return { success: true, user: data.user };
     } catch (error) {
       console.error('Sign in error:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Magic link (email OTP) authentication
+  async sendMagicLink(email: string) {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: Config.auth?.redirectUrl || 'debtmirror://auth/callback',
+        },
+      });
+      if (error) throw error;
+      logger.info('Magic link sent to:', email);
+      return { success: true };
+    } catch (error) {
+      console.error('Magic link error:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Verify magic link token (called when deep link is opened)
+  async verifyMagicLink(token: string, type: 'magiclink' | 'signup' | 'recovery' = 'magiclink') {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: token,
+        type,
+      });
+      if (error) throw error;
+      logger.info('Magic link verified successfully');
+      return { success: true, session: data.session, user: data.user };
+    } catch (error) {
+      console.error('Verify magic link error:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Exchange auth code from URL for session
+  async exchangeCodeForSession(code: string) {
+    try {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+      logger.info('Code exchanged for session successfully');
+      return { success: true, session: data.session, user: data.user };
+    } catch (error) {
+      console.error('Exchange code error:', error);
       return { success: false, error };
     }
   },
