@@ -16,6 +16,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { debtsService, CreateDebtInput } from '../services/debts';
+import { localStorageService } from '../services';
+import { useAuth } from '../context';
 import { logger } from '../utils';
 import { CurrencySelector, CurrencyPickerButton } from '../components';
 import { Currency, getCurrencyByCode } from '../constants/currencies';
@@ -36,6 +38,7 @@ const DEBT_TYPES = [
 export const AddDebtScreen: React.FC = () => {
     const navigation = useNavigation<AddDebtNavigationProp>();
     const route = useRoute<AddDebtRouteProp>();
+    const { isGuest } = useAuth();
     const editDebtId = route.params?.debtId;
     const isEditMode = !!editDebtId;
 
@@ -92,18 +95,37 @@ export const AddDebtScreen: React.FC = () => {
     const loadDebtData = async () => {
         try {
             setInitialLoading(true);
-            const { success, debt, error } = await debtsService.getDebt(editDebtId!);
-            if (success && debt) {
-                setName(debt.name);
-                setDebtType(debt.debt_type);
-                setCreditorName(debt.creditor_name || '');
-                setSelectedCurrencyCode(debt.currency_code || 'USD');
-                setCurrentBalance(debt.current_balance?.toString() || '');
-                setInterestRate(debt.interest_rate?.toString() || '');
-                setMinimumPayment(debt.minimum_payment?.toString() || '');
+
+            if (isGuest) {
+                // Load from local storage for guest users
+                const debt = await localStorageService.getLocalDebt(editDebtId!);
+                if (debt) {
+                    setName(debt.name);
+                    setDebtType(debt.debt_type);
+                    setCreditorName(debt.creditor_name || '');
+                    setSelectedCurrencyCode(debt.currency_code || 'USD');
+                    setCurrentBalance(debt.current_balance?.toString() || '');
+                    setInterestRate(debt.interest_rate?.toString() || '');
+                    setMinimumPayment(debt.minimum_payment?.toString() || '');
+                } else {
+                    Alert.alert('Error', 'Failed to load debt data');
+                    navigation.goBack();
+                }
             } else {
-                Alert.alert('Error', 'Failed to load debt data');
-                navigation.goBack();
+                // Load from Supabase for authenticated users
+                const { success, debt, error } = await debtsService.getDebt(editDebtId!);
+                if (success && debt) {
+                    setName(debt.name);
+                    setDebtType(debt.debt_type);
+                    setCreditorName(debt.creditor_name || '');
+                    setSelectedCurrencyCode(debt.currency_code || 'USD');
+                    setCurrentBalance(debt.current_balance?.toString() || '');
+                    setInterestRate(debt.interest_rate?.toString() || '');
+                    setMinimumPayment(debt.minimum_payment?.toString() || '');
+                } else {
+                    Alert.alert('Error', 'Failed to load debt data');
+                    navigation.goBack();
+                }
             }
         } catch (error) {
             logger.error('Load debt error:', error);
@@ -242,31 +264,64 @@ export const AddDebtScreen: React.FC = () => {
             const rate = interestRate ? parseFloat(formatNumber(interestRate)) : undefined;
             const minPay = minimumPayment ? parseFormattedValue(minimumPayment) : undefined;
 
-            const input: CreateDebtInput = {
-                name: name.trim(),
-                debt_type: debtType!,
-                creditor_name: creditorName.trim() || undefined,
-                currency_code: selectedCurrencyCode,
-                principal: balance,
-                current_balance: balance,
-                interest_rate: rate,
-                minimum_payment: minPay,
-            };
-
-            if (isEditMode) {
-                // Update existing debt
-                const { success, error } = await debtsService.updateDebt(editDebtId!, input);
-                if (!success) {
-                    throw error || new Error('Failed to update debt');
+            if (isGuest) {
+                // Use local storage for guest users
+                if (isEditMode) {
+                    const success = await localStorageService.updateLocalDebt(editDebtId!, {
+                        name: name.trim(),
+                        debt_type: debtType!,
+                        creditor_name: creditorName.trim() || undefined,
+                        currency_code: selectedCurrencyCode,
+                        principal: balance,
+                        current_balance: balance,
+                        interest_rate: rate,
+                        minimum_payment: minPay,
+                    });
+                    if (!success) {
+                        throw new Error('Failed to update debt');
+                    }
+                    logger.info('Local debt updated successfully');
+                } else {
+                    await localStorageService.saveLocalDebt({
+                        name: name.trim(),
+                        debt_type: debtType!,
+                        creditor_name: creditorName.trim() || undefined,
+                        currency_code: selectedCurrencyCode,
+                        principal: balance,
+                        current_balance: balance,
+                        interest_rate: rate,
+                        minimum_payment: minPay,
+                        status: 'active',
+                        priority: 0,
+                    });
+                    logger.info('Local debt added successfully');
                 }
-                logger.info('Debt updated successfully');
             } else {
-                // Create new debt
-                const { success, error } = await debtsService.createDebt(input);
-                if (!success) {
-                    throw error || new Error('Failed to create debt');
+                // Use Supabase for authenticated users
+                const input: CreateDebtInput = {
+                    name: name.trim(),
+                    debt_type: debtType!,
+                    creditor_name: creditorName.trim() || undefined,
+                    currency_code: selectedCurrencyCode,
+                    principal: balance,
+                    current_balance: balance,
+                    interest_rate: rate,
+                    minimum_payment: minPay,
+                };
+
+                if (isEditMode) {
+                    const { success, error } = await debtsService.updateDebt(editDebtId!, input);
+                    if (!success) {
+                        throw error || new Error('Failed to update debt');
+                    }
+                    logger.info('Debt updated successfully');
+                } else {
+                    const { success, error } = await debtsService.createDebt(input);
+                    if (!success) {
+                        throw error || new Error('Failed to create debt');
+                    }
+                    logger.info('Debt added successfully');
                 }
-                logger.info('Debt added successfully');
             }
 
             navigation.goBack();
