@@ -13,32 +13,33 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import { authService, supabase } from '../services';
+import { authService } from '../services';
+import { useAuth } from '../context';
 import { logger } from '../utils';
-import { Config } from '../constants/config';
 
 // Required for expo-auth-session to work properly
 WebBrowser.maybeCompleteAuthSession();
+
+type AuthMode = 'signin' | 'signup' | 'magiclink';
 
 export const AuthScreen: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [isSignUp, setIsSignUp] = useState(false);
+    const [authMode, setAuthMode] = useState<AuthMode>('magiclink');
+    const [magicLinkSent, setMagicLinkSent] = useState(false);
+
+    const { startGuestSession } = useAuth();
 
     // Create redirect URI for OAuth
-    // For Expo Go, we need to use the exp:// scheme
-    const redirectUri = AuthSession.makeRedirectUri({
-        // Use the Expo scheme for development
-        // This generates: exp://192.168.x.x:8081/--/auth/callback
-    });
+    const redirectUri = AuthSession.makeRedirectUri({});
 
     // Log the redirect URI for debugging (development only)
     useEffect(() => {
         logger.info('OAuth Redirect URI:', redirectUri);
     }, []);
 
-    const handleAuth = async () => {
+    const handleEmailPasswordAuth = async () => {
         if (!email.trim() || !password.trim()) {
             Alert.alert('Error', 'Please enter email and password');
             return;
@@ -51,7 +52,7 @@ export const AuthScreen: React.FC = () => {
 
         setLoading(true);
         try {
-            const { success, error } = isSignUp
+            const { success, error } = authMode === 'signup'
                 ? await authService.signUp(email.trim(), password)
                 : await authService.signIn(email.trim(), password);
 
@@ -59,9 +60,9 @@ export const AuthScreen: React.FC = () => {
                 throw error || new Error('Authentication failed');
             }
 
-            logger.info(`${isSignUp ? 'Sign up' : 'Sign in'} successful`);
+            logger.info(`${authMode === 'signup' ? 'Sign up' : 'Sign in'} successful`);
 
-            if (isSignUp) {
+            if (authMode === 'signup') {
                 Alert.alert(
                     'Success',
                     'Account created! Please check your email to verify your account.'
@@ -76,66 +77,106 @@ export const AuthScreen: React.FC = () => {
         }
     };
 
-    const toggleMode = () => {
-        setIsSignUp(!isSignUp);
-        setEmail('');
-        setPassword('');
-    };
+    const handleMagicLink = async () => {
+        if (!email.trim()) {
+            Alert.alert('Error', 'Please enter your email address');
+            return;
+        }
 
-    const handleGoogleAuth = async () => {
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+            Alert.alert('Error', 'Please enter a valid email address');
+            return;
+        }
+
         setLoading(true);
         try {
-            // Get the OAuth URL from Supabase
-            const { data, error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: redirectUri,
-                    skipBrowserRedirect: true, // We handle the browser ourselves
-                },
-            });
+            const { success, error } = await authService.sendMagicLink(email.trim());
 
-            if (error) throw error;
-            if (!data.url) throw new Error('No OAuth URL returned');
-
-            logger.info('Opening Google OAuth URL:', data.url);
-            logger.info('Redirect URI:', redirectUri);
-
-            // Open the browser for authentication
-            const result = await WebBrowser.openAuthSessionAsync(
-                data.url,
-                redirectUri
-            );
-
-            if (result.type === 'success' && result.url) {
-                // Extract the tokens from the URL
-                const url = new URL(result.url);
-                const params = new URLSearchParams(url.hash.slice(1)); // Remove the # prefix
-
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
-
-                if (accessToken) {
-                    // Set the session in Supabase
-                    const { error: sessionError } = await supabase.auth.setSession({
-                        access_token: accessToken,
-                        refresh_token: refreshToken || '',
-                    });
-
-                    if (sessionError) throw sessionError;
-                    logger.info('Google sign-in successful!');
-                } else {
-                    throw new Error('No access token in callback URL');
-                }
-            } else if (result.type === 'cancel') {
-                logger.info('User cancelled Google sign-in');
+            if (!success) {
+                throw error || new Error('Failed to send verification link');
             }
+
+            setMagicLinkSent(true);
+            logger.info('Magic link sent successfully');
         } catch (error) {
-            logger.error('Google auth error:', error);
-            Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
+            const message = (error as Error).message || 'Failed to send verification link';
+            logger.error('Magic link error:', error);
+            Alert.alert('Error', message);
         } finally {
             setLoading(false);
         }
     };
+
+    const handleGuestMode = async () => {
+        setLoading(true);
+        try {
+            await startGuestSession();
+            logger.info('Guest session started');
+        } catch (error) {
+            logger.error('Failed to start guest session:', error);
+            Alert.alert('Error', 'Failed to start guest mode. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const resetMagicLinkState = () => {
+        setMagicLinkSent(false);
+        setEmail('');
+    };
+
+    // Magic link sent confirmation view
+    if (magicLinkSent) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.content}>
+                    <View style={styles.header}>
+                        <Text style={styles.successIcon}>📧</Text>
+                        <Text style={styles.title}>Check Your Email</Text>
+                        <Text style={styles.subtitle}>
+                            We sent a verification link to
+                        </Text>
+                        <Text style={styles.emailText}>{email}</Text>
+                    </View>
+
+                    <View style={styles.instructionsContainer}>
+                        <Text style={styles.instructionsText}>
+                            Click the link in the email to sign in. The link will expire in 1 hour.
+                        </Text>
+                        <Text style={styles.instructionsSubtext}>
+                            Don't see the email? Check your spam folder.
+                        </Text>
+                    </View>
+
+                    <View style={styles.form}>
+                        <TouchableOpacity
+                            style={styles.button}
+                            onPress={handleMagicLink}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.buttonText}>Resend Link</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={resetMagicLinkState}
+                            disabled={loading}
+                        >
+                            <Text style={styles.secondaryButtonText}>
+                                Use Different Email
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -148,11 +189,16 @@ export const AuthScreen: React.FC = () => {
                         <Text style={styles.logo}>💰</Text>
                         <Text style={styles.title}>Debt Mirror</Text>
                         <Text style={styles.subtitle}>
-                            {isSignUp ? 'Create your account' : 'Welcome back'}
+                            {authMode === 'magiclink'
+                                ? 'Sign in with email link'
+                                : authMode === 'signup'
+                                    ? 'Create your account'
+                                    : 'Welcome back'}
                         </Text>
                     </View>
 
                     <View style={styles.form}>
+                        {/* Email Input */}
                         <View style={styles.inputContainer}>
                             <Text style={styles.inputLabel}>Email</Text>
                             <TextInput
@@ -168,69 +214,104 @@ export const AuthScreen: React.FC = () => {
                             />
                         </View>
 
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.inputLabel}>Password</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="••••••••"
-                                placeholderTextColor="#999"
-                                secureTextEntry
-                                editable={!loading}
-                                value={password}
-                                onChangeText={setPassword}
-                            />
-                        </View>
+                        {/* Password Input - Only show for signin/signup modes */}
+                        {authMode !== 'magiclink' && (
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.inputLabel}>Password</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="••••••••"
+                                    placeholderTextColor="#999"
+                                    secureTextEntry
+                                    editable={!loading}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                />
+                            </View>
+                        )}
 
+                        {/* Main Action Button */}
                         <TouchableOpacity
                             style={[styles.button, loading && styles.buttonDisabled]}
-                            onPress={handleAuth}
+                            onPress={authMode === 'magiclink' ? handleMagicLink : handleEmailPasswordAuth}
                             disabled={loading}
                         >
                             {loading ? (
                                 <ActivityIndicator color="#fff" />
                             ) : (
                                 <Text style={styles.buttonText}>
-                                    {isSignUp ? 'Sign Up' : 'Sign In'}
+                                    {authMode === 'magiclink'
+                                        ? 'Send Verification Link'
+                                        : authMode === 'signup'
+                                            ? 'Sign Up'
+                                            : 'Sign In'}
                                 </Text>
                             )}
                         </TouchableOpacity>
 
-                        {/* Social Auth */}
-                        <View style={styles.socialContainer}>
-                            <View style={styles.dividerContainer}>
-                                <View style={styles.divider} />
-                                <Text style={styles.dividerText}>OR</Text>
-                                <View style={styles.divider} />
-                            </View>
-
-                            <TouchableOpacity
-                                style={[styles.socialButton, styles.googleButton]}
-                                onPress={handleGoogleAuth}
-                                disabled={loading}
-                            >
-                                <Text style={styles.socialButtonText}>Continue with Google</Text>
-                            </TouchableOpacity>
-
-                            {/* Apple Sign In - Hidden for now
-                            <TouchableOpacity
-                                style={[styles.socialButton, styles.appleButton]}
-                                onPress={() => handleSocialAuth('apple')}
-                                disabled={loading}
-                            >
-                                <Text style={[styles.socialButtonText, styles.appleButtonText]}>Continue with Apple</Text>
-                            </TouchableOpacity>
-                            */}
+                        {/* Auth Mode Toggles */}
+                        <View style={styles.authModeContainer}>
+                            {authMode === 'magiclink' ? (
+                                <TouchableOpacity
+                                    style={styles.toggleButton}
+                                    onPress={() => {
+                                        setAuthMode('signin');
+                                        setPassword('');
+                                    }}
+                                    disabled={loading}
+                                >
+                                    <Text style={styles.toggleText}>
+                                        Use password instead
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <>
+                                    <TouchableOpacity
+                                        style={styles.toggleButton}
+                                        onPress={() => {
+                                            setAuthMode('magiclink');
+                                            setPassword('');
+                                        }}
+                                        disabled={loading}
+                                    >
+                                        <Text style={styles.toggleText}>
+                                            Use email link instead
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.toggleButton}
+                                        onPress={() => {
+                                            setAuthMode(authMode === 'signup' ? 'signin' : 'signup');
+                                            setPassword('');
+                                        }}
+                                        disabled={loading}
+                                    >
+                                        <Text style={styles.toggleText}>
+                                            {authMode === 'signup'
+                                                ? 'Already have an account? Sign In'
+                                                : "Don't have an account? Sign Up"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </>
+                            )}
                         </View>
 
+                        {/* Divider */}
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.divider} />
+                            <Text style={styles.dividerText}>OR</Text>
+                            <View style={styles.divider} />
+                        </View>
+
+                        {/* Guest Mode Button */}
                         <TouchableOpacity
-                            style={styles.toggleButton}
-                            onPress={toggleMode}
+                            style={styles.guestButton}
+                            onPress={handleGuestMode}
                             disabled={loading}
                         >
-                            <Text style={styles.toggleText}>
-                                {isSignUp
-                                    ? 'Already have an account? Sign In'
-                                    : "Don't have an account? Sign Up"}
+                            <Text style={styles.guestButtonText}>Continue as Guest</Text>
+                            <Text style={styles.guestSubtext}>
+                                Try free for 2 months, no account needed
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -270,6 +351,35 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 16,
         color: '#8E8E93',
+        textAlign: 'center',
+    },
+    successIcon: {
+        fontSize: 64,
+        marginBottom: 16,
+    },
+    emailText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#007AFF',
+        marginTop: 8,
+    },
+    instructionsContainer: {
+        backgroundColor: '#1C1C1E',
+        borderRadius: 12,
+        padding: 20,
+        marginBottom: 24,
+    },
+    instructionsText: {
+        fontSize: 15,
+        color: '#FFFFFF',
+        textAlign: 'center',
+        lineHeight: 22,
+    },
+    instructionsSubtext: {
+        fontSize: 13,
+        color: '#8E8E93',
+        textAlign: 'center',
+        marginTop: 12,
     },
     form: {
         gap: 16,
@@ -307,18 +417,29 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: '600',
     },
-    toggleButton: {
+    secondaryButton: {
         paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+    },
+    secondaryButtonText: {
+        color: '#007AFF',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    authModeContainer: {
+        gap: 8,
+    },
+    toggleButton: {
+        paddingVertical: 12,
         alignItems: 'center',
     },
     toggleText: {
         color: '#007AFF',
         fontSize: 15,
         fontWeight: '500',
-    },
-    socialContainer: {
-        marginTop: 16,
-        gap: 12,
     },
     dividerContainer: {
         flexDirection: 'row',
@@ -336,26 +457,22 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
     },
-    socialButton: {
+    guestButton: {
+        backgroundColor: '#1C1C1E',
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#2C2C2E',
-    },
-    googleButton: {
-        backgroundColor: '#FFFFFF',
-    },
-    appleButton: {
-        backgroundColor: '#000000',
         borderColor: '#3A3A3C',
     },
-    socialButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#000000', // Default for Google
-    },
-    appleButtonText: {
+    guestButtonText: {
         color: '#FFFFFF',
+        fontSize: 17,
+        fontWeight: '600',
+    },
+    guestSubtext: {
+        color: '#8E8E93',
+        fontSize: 13,
+        marginTop: 4,
     },
 });
