@@ -12,7 +12,7 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
-import { supabase } from '../services';
+import { supabase, localStorageService } from '../services';
 import { useAuth } from '../context';
 import { logger } from '../utils';
 
@@ -28,7 +28,7 @@ const PROFESSIONS = [
 ];
 
 export const OnboardingScreen: React.FC = () => {
-    const { user, checkOnboardingStatus } = useAuth();
+    const { user, isGuest, guestDaysRemaining, checkOnboardingStatus } = useAuth();
     const [profession, setProfession] = useState<string | null>(null);
     const [monthlyIncome, setMonthlyIncome] = useState('');
     const [loading, setLoading] = useState(false);
@@ -45,26 +45,38 @@ export const OnboardingScreen: React.FC = () => {
             return;
         }
 
-        if (!user) {
+        // Check for authenticated user if not in guest mode
+        if (!isGuest && !user) {
             Alert.alert('Error', 'User not found. Please sign in again.');
             return;
         }
 
         setLoading(true);
         try {
-            // Insert income record
-            const { error } = await supabase.from('income').insert({
-                user_id: user.id,
-                profession: profession,
-                monthly_amount: incomeValue,
-                created_at: new Date().toISOString(),
-            });
+            if (isGuest) {
+                // Save to local storage for guest users
+                await localStorageService.saveLocalIncome({
+                    source_name: profession,
+                    amount: incomeValue,
+                    currency_code: 'USD',
+                    frequency: 'monthly',
+                    is_primary: true,
+                });
+                logger.info('Guest onboarding completed');
+            } else {
+                // Save to Supabase for authenticated users
+                const { error } = await supabase.from('income').insert({
+                    user_id: user!.id,
+                    profession: profession,
+                    monthly_amount: incomeValue,
+                    created_at: new Date().toISOString(),
+                });
 
-            if (error) {
-                throw error;
+                if (error) {
+                    throw error;
+                }
+                logger.info('Onboarding completed');
             }
-
-            logger.info('Onboarding completed');
 
             // Refresh onboarding status
             await checkOnboardingStatus();
@@ -99,6 +111,18 @@ export const OnboardingScreen: React.FC = () => {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
+                    {/* Guest Mode Banner */}
+                    {isGuest && (
+                        <View style={styles.guestBanner}>
+                            <Text style={styles.guestBannerText}>
+                                Guest Mode • {guestDaysRemaining} days remaining
+                            </Text>
+                            <Text style={styles.guestBannerSubtext}>
+                                Create an account to save your data permanently
+                            </Text>
+                        </View>
+                    )}
+
                     <View style={styles.header}>
                         <Text style={styles.title}>Let's get started</Text>
                         <Text style={styles.subtitle}>
@@ -180,6 +204,23 @@ const styles = StyleSheet.create({
     scrollContent: {
         padding: 24,
         paddingBottom: 40,
+    },
+    guestBanner: {
+        backgroundColor: '#FF9500',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 24,
+        alignItems: 'center',
+    },
+    guestBannerText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    guestBannerSubtext: {
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: 13,
+        marginTop: 4,
     },
     header: {
         marginBottom: 32,
