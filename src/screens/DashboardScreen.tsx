@@ -15,6 +15,7 @@ import { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context';
 import { debtsService, Debt } from '../services/debts';
 import { incomeService, IncomeSource } from '../services/incomeService';
+import { localStorageService, LocalDebt, LocalIncome } from '../services';
 import { logger } from '../utils';
 import { formatCurrencyAmount, getCurrencyByCode } from '../constants/currencies';
 
@@ -28,7 +29,7 @@ interface CurrencyTotal {
 
 export const DashboardScreen: React.FC = () => {
     const navigation = useNavigation<DashboardNavigationProp>();
-    const { user } = useAuth();
+    const { user, isGuest, guestDaysRemaining } = useAuth();
 
     const [debts, setDebts] = useState<Debt[]>([]);
     const [loading, setLoading] = useState(true);
@@ -41,30 +42,82 @@ export const DashboardScreen: React.FC = () => {
 
     const fetchData = useCallback(async () => {
         try {
-            const [debtsResult, totalsResult] = await Promise.all([
-                debtsService.listDebts(),
-                debtsService.getDebtTotalsByCurrency(),
-            ]);
+            if (isGuest) {
+                // Fetch data from local storage for guest users
+                const localDebts = await localStorageService.getLocalDebts();
+                const localIncome = await localStorageService.getLocalIncome();
 
-            if (debtsResult.success && debtsResult.debts) {
-                setDebts(debtsResult.debts);
-            }
+                // Convert local debts to Debt format for display
+                const formattedDebts: Debt[] = localDebts.map(d => ({
+                    ...d,
+                    user_id: 'guest',
+                }));
+                setDebts(formattedDebts);
 
-            if (totalsResult.success) {
-                setTotalsByCurrency(totalsResult.totalsByCurrency || {});
-                setTotalDebts(totalsResult.totalDebts || 0);
-                setAvgInterestRate(totalsResult.avgInterestRate || 0);
-            }
+                // Calculate totals by currency from local debts
+                const activeDebts = localDebts.filter(d => d.status === 'active');
+                const totals: { [currencyCode: string]: CurrencyTotal } = {};
 
-            // Fetch income sources
-            if (user) {
-                try {
-                    const sources = await incomeService.getAll(user.id);
-                    setIncomeSources(sources);
-                    const total = sources.reduce((sum, s) => sum + s.monthly_amount, 0);
-                    setTotalMonthlyIncome(total);
-                } catch (incomeError) {
-                    logger.error('Income fetch error:', incomeError);
+                for (const debt of activeDebts) {
+                    const currencyCode = debt.currency_code || 'USD';
+                    if (!totals[currencyCode]) {
+                        totals[currencyCode] = { totalBalance: 0, totalMinPayment: 0, debtCount: 0 };
+                    }
+                    totals[currencyCode].totalBalance += debt.current_balance || 0;
+                    totals[currencyCode].totalMinPayment += debt.minimum_payment || 0;
+                    totals[currencyCode].debtCount += 1;
+                }
+
+                setTotalsByCurrency(totals);
+                setTotalDebts(activeDebts.length);
+
+                // Calculate avg interest rate
+                const debtsWithRate = activeDebts.filter(d => d.interest_rate != null);
+                const avgRate = debtsWithRate.length > 0
+                    ? debtsWithRate.reduce((sum, d) => sum + (d.interest_rate || 0), 0) / debtsWithRate.length
+                    : 0;
+                setAvgInterestRate(avgRate);
+
+                // Set income from local storage
+                const total = localIncome.reduce((sum, s) => sum + s.amount, 0);
+                setTotalMonthlyIncome(total);
+                setIncomeSources(localIncome.map(i => ({
+                    id: i.id,
+                    user_id: 'guest',
+                    source_name: i.source_name,
+                    monthly_amount: i.amount,
+                    currency_code: i.currency_code,
+                    is_primary: i.is_primary,
+                    created_at: i.created_at,
+                    updated_at: i.updated_at,
+                })));
+            } else {
+                // Fetch data from Supabase for authenticated users
+                const [debtsResult, totalsResult] = await Promise.all([
+                    debtsService.listDebts(),
+                    debtsService.getDebtTotalsByCurrency(),
+                ]);
+
+                if (debtsResult.success && debtsResult.debts) {
+                    setDebts(debtsResult.debts);
+                }
+
+                if (totalsResult.success) {
+                    setTotalsByCurrency(totalsResult.totalsByCurrency || {});
+                    setTotalDebts(totalsResult.totalDebts || 0);
+                    setAvgInterestRate(totalsResult.avgInterestRate || 0);
+                }
+
+                // Fetch income sources
+                if (user) {
+                    try {
+                        const sources = await incomeService.getAll(user.id);
+                        setIncomeSources(sources);
+                        const total = sources.reduce((sum, s) => sum + s.monthly_amount, 0);
+                        setTotalMonthlyIncome(total);
+                    } catch (incomeError) {
+                        logger.error('Income fetch error:', incomeError);
+                    }
                 }
             }
         } catch (error) {
@@ -73,7 +126,7 @@ export const DashboardScreen: React.FC = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [user]);
+    }, [user, isGuest]);
 
     // Refresh on screen focus
     useFocusEffect(
@@ -114,12 +167,30 @@ export const DashboardScreen: React.FC = () => {
                     />
                 }
             >
+                {/* Guest Mode Banner */}
+                {isGuest && (
+                    <TouchableOpacity
+                        style={styles.guestBanner}
+                        onPress={() => navigation.navigate('Settings')}
+                    >
+                        <View style={styles.guestBannerContent}>
+                            <Text style={styles.guestBannerText}>
+                                Guest Mode • {guestDaysRemaining} days remaining
+                            </Text>
+                            <Text style={styles.guestBannerSubtext}>
+                                Tap to create an account and save your data
+                            </Text>
+                        </View>
+                        <Text style={styles.guestBannerArrow}>›</Text>
+                    </TouchableOpacity>
+                )}
+
                 {/* Header */}
                 <View style={styles.header}>
                     <View>
                         <Text style={styles.greeting}>Welcome back,</Text>
                         <Text style={styles.userName}>
-                            {user?.email?.split('@')[0] || 'User'}
+                            {isGuest ? 'Guest' : (user?.email?.split('@')[0] || 'User')}
                         </Text>
                     </View>
                     <TouchableOpacity
@@ -270,6 +341,33 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    guestBanner: {
+        backgroundColor: '#FF9500',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    guestBannerContent: {
+        flex: 1,
+    },
+    guestBannerText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    guestBannerSubtext: {
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: 13,
+        marginTop: 2,
+    },
+    guestBannerArrow: {
+        color: '#FFFFFF',
+        fontSize: 24,
+        fontWeight: '300',
+        marginLeft: 8,
     },
     scrollView: {
         flex: 1,
