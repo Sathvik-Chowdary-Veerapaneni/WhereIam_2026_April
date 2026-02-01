@@ -10,6 +10,7 @@ export type RootStackParamList = {
   Dashboard: undefined;
   AddDebt: { debtId?: string } | undefined;
   DebtLedger: { currencyCode?: string } | undefined;
+  IncomeLedger: undefined;
   Settings: undefined;
   EditProfile: undefined;
   Test: undefined;

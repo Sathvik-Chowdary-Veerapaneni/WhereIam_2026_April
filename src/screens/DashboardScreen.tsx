@@ -201,34 +201,23 @@ export const DashboardScreen: React.FC = () => {
                 {/* Income Section */}
                 <Text style={styles.sectionTitle}>Monthly Income</Text>
                 <TouchableOpacity
-                    style={styles.incomeCard}
-                    onPress={() => navigation.navigate('EditProfile')}
+                    style={styles.incomeTotalCard}
+                    onPress={() => navigation.navigate('IncomeLedger')}
                     activeOpacity={0.7}
                 >
-                    <View style={styles.incomeCardContent}>
-                        <View style={styles.incomeMainInfo}>
-                            <Text style={styles.incomeIcon}>💰</Text>
-                            <View style={styles.incomeTextContainer}>
-                                <Text style={styles.incomeTotalAmount}>
-                                    ${totalMonthlyIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </Text>
-                                <Text style={styles.incomeSubtext}>
-                                    {incomeSources.length} income source{incomeSources.length !== 1 ? 's' : ''}
-                                </Text>
-                            </View>
-                        </View>
-                        <View style={styles.incomeCardRight}>
-                            <Text style={styles.incomeEditText}>Edit</Text>
-                            <Text style={styles.incomeChevron}>›</Text>
+                    <View style={styles.incomeTotalHeader}>
+                        <Text style={styles.incomeTypeIcon}>💰</Text>
+                        <Text style={styles.incomeTypeLabel}>Total Income</Text>
+                        <View style={styles.incomeEditBadge}>
+                            <Text style={styles.incomeEditBadgeText}>View All ›</Text>
                         </View>
                     </View>
-                    {incomeSources.length === 0 && (
-                        <View style={styles.incomeEmptyHint}>
-                            <Text style={styles.incomeEmptyText}>
-                                Tap to add your salary, side gigs, and cash earnings
-                            </Text>
-                        </View>
-                    )}
+                    <Text style={styles.incomeTotalAmount}>
+                        ${totalMonthlyIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                    <Text style={styles.incomeTotalSubtext}>
+                        {incomeSources.length} income source{incomeSources.length !== 1 ? 's' : ''} • Tap to view details
+                    </Text>
                 </TouchableOpacity>
 
                 {/* Quick Actions */}
@@ -461,6 +450,7 @@ const styles = StyleSheet.create({
     // Currency totals styles
     currencyTotalsContainer: {
         gap: 12,
+        marginBottom: 24,
     },
     currencyTotalCard: {
         backgroundColor: '#1C1C1E',
@@ -503,8 +493,8 @@ const styles = StyleSheet.create({
         color: '#8E8E93',
     },
 
-    // Income section styles
-    incomeCard: {
+    // Income section styles - matching debt by currency design
+    incomeTotalCard: {
         backgroundColor: '#1C1C1E',
         borderRadius: 16,
         padding: 16,
@@ -512,56 +502,37 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#34C75940',
     },
-    incomeCardContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    incomeMainInfo: {
+    incomeTotalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        flex: 1,
+        gap: 8,
+        marginBottom: 8,
     },
-    incomeIcon: {
-        fontSize: 32,
-        marginRight: 12,
+    incomeTypeIcon: {
+        fontSize: 24,
     },
-    incomeTextContainer: {
-        flex: 1,
+    incomeTypeLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#8E8E93',
+        letterSpacing: 0.5,
+    },
+    incomeEditBadge: {
+        marginLeft: 'auto',
+    },
+    incomeEditBadgeText: {
+        fontSize: 13,
+        color: '#007AFF',
+        fontWeight: '500',
     },
     incomeTotalAmount: {
         fontSize: 28,
         fontWeight: '700',
         color: '#34C759',
-        marginBottom: 2,
+        marginBottom: 4,
     },
-    incomeSubtext: {
+    incomeTotalSubtext: {
         fontSize: 13,
         color: '#8E8E93',
-    },
-    incomeCardRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    incomeEditText: {
-        fontSize: 14,
-        color: '#007AFF',
-        fontWeight: '500',
-    },
-    incomeChevron: {
-        fontSize: 20,
-        color: '#007AFF',
-    },
-    incomeEmptyHint: {
-        marginTop: 12,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#2C2C2E',
-    },
-    incomeEmptyText: {
-        fontSize: 13,
-        color: '#8E8E93',
-        textAlign: 'center',
     },
 });

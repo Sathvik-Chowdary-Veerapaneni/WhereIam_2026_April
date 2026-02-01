@@ -11,6 +11,7 @@ import {
   SettingsScreen,
   AddDebtScreen,
   DebtLedgerScreen,
+  IncomeLedgerScreen,
   HomeScreen,
   NotFoundScreen,
   TestScreen,
@@ -110,6 +111,14 @@ export const RootNavigator: React.FC = () => {
                   : 'Debts List',
                 presentation: 'card',
               })}
+            />
+            <Stack.Screen
+              name="IncomeLedger"
+              component={IncomeLedgerScreen}
+              options={{
+                title: 'Income Sources',
+                presentation: 'card',
+              }}
             />
             <Stack.Screen
               name="Home"
