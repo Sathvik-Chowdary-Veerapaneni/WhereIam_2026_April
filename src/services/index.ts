@@ -6,4 +6,6 @@ export { plaidService } from './plaid';
 export { revenueCatService } from './revenueCat';
 export { debtsService } from './debts';
 export { incomeService } from './incomeService';
+export { debtTransactionsService } from './debtTransactions';
+export type { DebtTransaction, CreateTransactionInput } from './debtTransactions';
 

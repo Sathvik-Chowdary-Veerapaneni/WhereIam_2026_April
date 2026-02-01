@@ -69,6 +69,28 @@ export const debtsService = {
                 throw error;
             }
 
+            // Create initial 'genesis' transaction to record the starting balance
+            if (data) {
+                const { error: txnError } = await supabase
+                    .from('debt_transactions')
+                    .insert({
+                        debt_id: data.id,
+                        user_id: user.id,
+                        type: 'initial',
+                        amount: data.principal, // The starting principal
+                        interest_amount: 0,
+                        new_balance: data.principal, // Initial balance snapshot
+                        notes: 'Initial Balance',
+                        created_at: new Date().toISOString(),
+                    });
+
+                if (txnError) {
+                    logger.error('Failed to create initial transaction entry:', txnError);
+                    // We don't throw here to avoid failing the whole debt creation, 
+                    // but it's worth logging.
+                }
+            }
+
             logger.info('Debt created:', data?.name);
             return { success: true, debt: data };
         } catch (error) {

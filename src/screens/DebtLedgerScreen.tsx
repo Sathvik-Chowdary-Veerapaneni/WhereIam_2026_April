@@ -10,6 +10,10 @@ import {
     RefreshControl,
     Alert,
     Animated,
+    Modal,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -17,6 +21,7 @@ import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navig
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { debtsService, Debt } from '../services/debts';
+import { debtTransactionsService, DebtTransaction } from '../services/debtTransactions';
 import { logger } from '../utils';
 import { formatCurrencyAmount, getCurrencyByCode } from '../constants/currencies';
 
@@ -60,6 +65,19 @@ export const DebtLedgerScreen: React.FC = () => {
     const [totalsByCurrency, setTotalsByCurrency] = useState<{ [currencyCode: string]: CurrencyTotal }>({});
     const [totalDebts, setTotalDebts] = useState(0);
 
+    // Transaction history state
+    const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
+    const [transactions, setTransactions] = useState<{ [debtId: string]: DebtTransaction[] }>({});
+    const [loadingTransactions, setLoadingTransactions] = useState<string | null>(null);
+
+    // Add transaction modal state
+    const [transactionModalVisible, setTransactionModalVisible] = useState(false);
+    const [transactionDebt, setTransactionDebt] = useState<Debt | null>(null);
+    const [transactionType, setTransactionType] = useState<'payment' | 'borrow'>('payment');
+    const [transactionAmount, setTransactionAmount] = useState('');
+    const [transactionNotes, setTransactionNotes] = useState('');
+    const [savingTransaction, setSavingTransaction] = useState(false);
+
     const fetchData = useCallback(async () => {
         try {
             const [debtsResult, totalsResult] = await Promise.all([
@@ -68,7 +86,6 @@ export const DebtLedgerScreen: React.FC = () => {
             ]);
 
             if (debtsResult.success && debtsResult.debts) {
-                // Filter by currency if provided
                 const filteredDebts = filterCurrency
                     ? debtsResult.debts.filter(d => (d.currency_code || 'USD') === filterCurrency)
                     : debtsResult.debts;
@@ -87,9 +104,76 @@ export const DebtLedgerScreen: React.FC = () => {
         }
     }, [filterCurrency]);
 
+    const fetchTransactions = useCallback(async (debtId: string) => {
+        setLoadingTransactions(debtId);
+        try {
+            const result = await debtTransactionsService.getTransactionsByDebt(debtId);
+            if (result.success && result.transactions) {
+                setTransactions(prev => ({ ...prev, [debtId]: result.transactions! }));
+            }
+        } catch (error) {
+            logger.error('Fetch transactions error:', error);
+        } finally {
+            setLoadingTransactions(null);
+        }
+    }, []);
+
+    const handleToggleExpand = useCallback((debt: Debt) => {
+        if (expandedDebtId === debt.id) {
+            setExpandedDebtId(null);
+        } else {
+            setExpandedDebtId(debt.id);
+            if (!transactions[debt.id]) {
+                fetchTransactions(debt.id);
+            }
+        }
+    }, [expandedDebtId, transactions, fetchTransactions]);
+
     const handleEditDebt = useCallback((debt: Debt) => {
         navigation.navigate('AddDebt', { debtId: debt.id });
     }, [navigation]);
+
+    const openTransactionModal = useCallback((debt: Debt, type: 'payment' | 'borrow') => {
+        setTransactionDebt(debt);
+        setTransactionType(type);
+        setTransactionAmount('');
+        setTransactionNotes('');
+        setTransactionModalVisible(true);
+    }, []);
+
+    const handleSaveTransaction = useCallback(async () => {
+        if (!transactionDebt) return;
+
+        const amount = parseFloat(transactionAmount);
+        if (!transactionAmount || isNaN(amount) || amount <= 0) {
+            Alert.alert('Error', 'Please enter a valid amount');
+            return;
+        }
+
+        setSavingTransaction(true);
+        try {
+            const result = await debtTransactionsService.createTransaction({
+                debt_id: transactionDebt.id,
+                type: transactionType,
+                amount,
+                notes: transactionNotes || undefined,
+            });
+
+            if (result.success) {
+                setTransactionModalVisible(false);
+                // Refresh data
+                await fetchData();
+                await fetchTransactions(transactionDebt.id);
+            } else {
+                throw result.error || new Error('Failed to save transaction');
+            }
+        } catch (error) {
+            logger.error('Save transaction error:', error);
+            Alert.alert('Error', 'Failed to save transaction. Please try again.');
+        } finally {
+            setSavingTransaction(false);
+        }
+    }, [transactionDebt, transactionType, transactionAmount, transactionNotes, fetchData, fetchTransactions]);
 
     useFocusEffect(
         useCallback(() => {
@@ -102,7 +186,6 @@ export const DebtLedgerScreen: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    // Ref to track open swipeable items
     const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
     const closeSwipeable = useCallback((debtId: string) => {
@@ -118,7 +201,6 @@ export const DebtLedgerScreen: React.FC = () => {
         });
     }, []);
 
-    // Handle delete debt with confirmation and optimistic update
     const handleDeleteDebt = useCallback((debt: Debt) => {
         Alert.alert(
             'Delete Debt',
@@ -192,15 +274,15 @@ export const DebtLedgerScreen: React.FC = () => {
         );
     }, [closeSwipeable, debts, totalsByCurrency, totalDebts, fetchData]);
 
-    // Render the delete action for swipe
+    // Render swipe actions: Edit (blue) + Delete (red)
     const renderRightActions = useCallback((
         progress: Animated.AnimatedInterpolation<number>,
         dragX: Animated.AnimatedInterpolation<number>,
         debt: Debt
     ) => {
         const translateX = dragX.interpolate({
-            inputRange: [-100, 0],
-            outputRange: [0, 100],
+            inputRange: [-180, 0],
+            outputRange: [0, 180],
             extrapolate: 'clamp',
         });
 
@@ -212,7 +294,7 @@ export const DebtLedgerScreen: React.FC = () => {
         return (
             <Animated.View
                 style={[
-                    styles.deleteAction,
+                    styles.swipeActionsContainer,
                     {
                         transform: [{ translateX }],
                         opacity,
@@ -220,17 +302,26 @@ export const DebtLedgerScreen: React.FC = () => {
                 ]}
             >
                 <TouchableOpacity
-                    style={styles.deleteButton}
+                    style={styles.editAction}
+                    onPress={() => {
+                        closeSwipeable(debt.id);
+                        handleEditDebt(debt);
+                    }}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.deleteAction}
                     onPress={() => handleDeleteDebt(debt)}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.deleteButtonText}>Delete</Text>
+                    <Text style={styles.actionButtonText}>Delete</Text>
                 </TouchableOpacity>
             </Animated.View>
         );
-    }, [handleDeleteDebt]);
+    }, [closeSwipeable, handleEditDebt, handleDeleteDebt]);
 
-    // Get sorted currency codes for display
     const sortedCurrencyCodes = Object.keys(totalsByCurrency).sort();
 
     const formatDate = (dateString?: string): string => {
@@ -240,6 +331,14 @@ export const DebtLedgerScreen: React.FC = () => {
             month: 'short',
             day: 'numeric',
             year: 'numeric',
+        });
+    };
+
+    const formatTime = (dateString: string): string => {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
         });
     };
 
@@ -268,10 +367,9 @@ export const DebtLedgerScreen: React.FC = () => {
                         />
                     }
                 >
-                    {/* Summary Header - Totals by Currency */}
+                    {/* Summary Header */}
                     <View style={styles.summaryCard}>
                         {filterCurrency ? (
-                            // Filtered view - show only selected currency
                             <View style={styles.filteredSummary}>
                                 <View style={styles.filteredHeader}>
                                     <Text style={styles.filteredCurrencyFlag}>
@@ -285,17 +383,16 @@ export const DebtLedgerScreen: React.FC = () => {
                                         : formatCurrencyAmount(0, filterCurrency)}
                                 </Text>
                                 <Text style={styles.filteredCount}>
-                                    {debts.length} debt{debts.length !== 1 ? 's' : ''} • Tap to edit
+                                    {debts.length} debt{debts.length !== 1 ? 's' : ''} • Tap to view history
                                 </Text>
                             </View>
                         ) : (
-                            // All debts view
                             <View style={styles.summaryRow}>
                                 <View style={styles.summaryItem}>
                                     <Text style={styles.summaryLabel}>Total Debts</Text>
                                     <Text style={styles.summaryValue}>{totalDebts}</Text>
                                 </View>
-                                {sortedCurrencyCodes.map((code, index) => {
+                                {sortedCurrencyCodes.map((code) => {
                                     const totals = totalsByCurrency[code];
                                     const currency = getCurrencyByCode(code);
                                     return (
@@ -326,70 +423,146 @@ export const DebtLedgerScreen: React.FC = () => {
                         <View style={styles.ledgerContainer}>
                             {debts.map((debt, index) => {
                                 const debtCurrency = getCurrencyByCode(debt.currency_code || 'USD');
+                                const isExpanded = expandedDebtId === debt.id;
+                                const debtTransactions = transactions[debt.id] || [];
+
                                 return (
-                                    <Swipeable
-                                        key={debt.id}
-                                        ref={(ref) => {
-                                            if (ref) {
-                                                swipeableRefs.current.set(debt.id, ref);
-                                            } else {
-                                                swipeableRefs.current.delete(debt.id);
+                                    <View key={debt.id}>
+                                        <Swipeable
+                                            ref={(ref) => {
+                                                if (ref) {
+                                                    swipeableRefs.current.set(debt.id, ref);
+                                                } else {
+                                                    swipeableRefs.current.delete(debt.id);
+                                                }
+                                            }}
+                                            onSwipeableWillOpen={() => closeOtherSwipeables(debt.id)}
+                                            renderRightActions={(progress, dragX) =>
+                                                renderRightActions(progress, dragX, debt)
                                             }
-                                        }}
-                                        onSwipeableWillOpen={() => closeOtherSwipeables(debt.id)}
-                                        renderRightActions={(progress, dragX) =>
-                                            renderRightActions(progress, dragX, debt)
-                                        }
-                                        rightThreshold={40}
-                                        overshootRight={false}
-                                        friction={2}
-                                    >
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.ledgerRow,
-                                                index === debts.length - 1 && styles.ledgerRowLast,
-                                            ]}
-                                            onPress={() => handleEditDebt(debt)}
-                                            activeOpacity={0.7}
+                                            rightThreshold={40}
+                                            overshootRight={false}
+                                            friction={2}
                                         >
-                                            <View style={styles.ledgerDebtInfo}>
-                                                <View style={styles.ledgerIcon}>
-                                                    <Text style={styles.ledgerIconText}>
-                                                        {DEBT_TYPE_ICONS[debt.debt_type] || '📋'}
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.ledgerRow,
+                                                    isExpanded && styles.ledgerRowExpanded,
+                                                ]}
+                                                onPress={() => handleToggleExpand(debt)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={styles.ledgerDebtInfo}>
+                                                    <View style={styles.ledgerIcon}>
+                                                        <Text style={styles.ledgerIconText}>
+                                                            {DEBT_TYPE_ICONS[debt.debt_type] || '📋'}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={styles.ledgerDebtDetails}>
+                                                        <Text style={styles.ledgerDebtName} numberOfLines={1}>
+                                                            {debt.name}
+                                                        </Text>
+                                                        <Text style={styles.ledgerDebtType}>
+                                                            {debtCurrency.flag} {debt.creditor_name || DEBT_TYPE_LABELS[debt.debt_type] || 'Other'}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <View style={styles.ledgerApr}>
+                                                    <Text style={styles.ledgerAprValue}>
+                                                        {debt.interest_rate != null ? `${debt.interest_rate}%` : '—'}
                                                     </Text>
                                                 </View>
-                                                <View style={styles.ledgerDebtDetails}>
-                                                    <Text style={styles.ledgerDebtName} numberOfLines={1}>
-                                                        {debt.name}
+                                                <View style={styles.ledgerBalance}>
+                                                    <Text style={styles.ledgerBalanceValue}>
+                                                        {formatCurrencyAmount(debt.current_balance, debt.currency_code || 'USD')}
                                                     </Text>
-                                                    <Text style={styles.ledgerDebtType}>
-                                                        {debtCurrency.flag} {debt.creditor_name || DEBT_TYPE_LABELS[debt.debt_type] || 'Other'}
+                                                    <Text style={styles.expandIndicator}>
+                                                        {isExpanded ? '▲' : '▼'}
                                                     </Text>
                                                 </View>
-                                            </View>
-                                            <View style={styles.ledgerApr}>
-                                                <Text style={styles.ledgerAprValue}>
-                                                    {debt.interest_rate != null ? `${debt.interest_rate}%` : '—'}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.ledgerBalance}>
-                                                <Text style={styles.ledgerBalanceValue}>
-                                                    {formatCurrencyAmount(debt.current_balance, debt.currency_code || 'USD')}
-                                                </Text>
-                                                {debt.minimum_payment != null && debt.minimum_payment > 0 && (
-                                                    <Text style={styles.ledgerMinPayment}>
-                                                        Min: {formatCurrencyAmount(debt.minimum_payment, debt.currency_code || 'USD')}
-                                                    </Text>
+                                            </TouchableOpacity>
+                                        </Swipeable>
+
+                                        {/* Expanded Transaction History */}
+                                        {isExpanded && (
+                                            <View style={styles.transactionContainer}>
+                                                {/* Action Buttons */}
+                                                <View style={styles.transactionActions}>
+                                                    <TouchableOpacity
+                                                        style={styles.paymentButton}
+                                                        onPress={() => openTransactionModal(debt, 'payment')}
+                                                    >
+                                                        <Text style={styles.paymentButtonText}>+ Pay Off</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={styles.borrowButton}
+                                                        onPress={() => openTransactionModal(debt, 'borrow')}
+                                                    >
+                                                        <Text style={styles.borrowButtonText}>+ Borrow</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                {/* Transaction History */}
+                                                <Text style={styles.transactionTitle}>Transaction History</Text>
+
+                                                {loadingTransactions === debt.id ? (
+                                                    <ActivityIndicator size="small" color="#007AFF" style={styles.transactionLoading} />
+                                                ) : debtTransactions.length > 0 ? (
+                                                    debtTransactions.map((txn) => (
+                                                        <View key={txn.id} style={styles.transactionItem}>
+                                                            <View style={styles.transactionLeft}>
+                                                                <Text style={[
+                                                                    styles.transactionType,
+                                                                    txn.type === 'payment' ? styles.transactionPayment :
+                                                                        txn.type === 'borrow' ? styles.transactionBorrow : styles.transactionInitial
+                                                                ]}>
+                                                                    {txn.type === 'payment' ? '−' : txn.type === 'borrow' ? '+' : '🏁'}
+                                                                </Text>
+                                                                <View>
+                                                                    <Text style={styles.transactionDate}>
+                                                                        {formatDate(txn.created_at)} • {formatTime(txn.created_at)}
+                                                                    </Text>
+                                                                    {txn.notes && (
+                                                                        <Text style={styles.transactionNotes}>{txn.notes}</Text>
+                                                                    )}
+                                                                    {txn.type === 'borrow' && txn.interest_amount > 0 && (
+                                                                        <Text style={styles.transactionInterest}>
+                                                                            Interest: {formatCurrencyAmount(txn.interest_amount, debt.currency_code || 'USD')}
+                                                                        </Text>
+                                                                    )}
+                                                                </View>
+                                                            </View>
+                                                            <View style={styles.transactionRight}>
+                                                                <Text style={[
+                                                                    styles.transactionAmount,
+                                                                    txn.type === 'payment' ? styles.transactionPayment :
+                                                                        txn.type === 'borrow' ? styles.transactionBorrow : styles.transactionInitial
+                                                                ]}>
+                                                                    {txn.type === 'payment' ? '−' : '+'}
+                                                                    {formatCurrencyAmount(txn.amount, debt.currency_code || 'USD')}
+                                                                </Text>
+                                                                {txn.new_balance !== undefined && txn.new_balance !== null && (
+                                                                    <Text style={styles.transactionRunningBalance}>
+                                                                        Bal: {formatCurrencyAmount(txn.new_balance, debt.currency_code || 'USD')}
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+                                                        </View>
+                                                    ))
+                                                ) : (
+                                                    <Text style={styles.noTransactions}>No transactions yet</Text>
                                                 )}
                                             </View>
-                                        </TouchableOpacity>
-                                    </Swipeable>
+                                        )}
+
+                                        {/* Divider between debts */}
+                                        {index < debts.length - 1 && <View style={styles.debtDivider} />}
+                                    </View>
                                 );
                             })}
 
-                            {/* Ledger Footer / Totals by Currency */}
+                            {/* Ledger Footer */}
                             {filterCurrency ? (
-                                // Show only filtered currency total
                                 totalsByCurrency[filterCurrency] && (
                                     <View style={styles.ledgerFooter}>
                                         <Text style={styles.ledgerFooterLabel}>
@@ -401,7 +574,6 @@ export const DebtLedgerScreen: React.FC = () => {
                                     </View>
                                 )
                             ) : (
-                                // Show all currency totals
                                 sortedCurrencyCodes.map((code) => {
                                     const totals = totalsByCurrency[code];
                                     const currency = getCurrencyByCode(code);
@@ -431,10 +603,132 @@ export const DebtLedgerScreen: React.FC = () => {
                     {/* Footer Info */}
                     {debts.length > 0 && (
                         <Text style={styles.footerNote}>
-                            Tap to edit • Swipe left to delete
+                            Tap to view history • Swipe left to edit/delete
                         </Text>
                     )}
                 </ScrollView>
+
+                {/* Add Transaction Modal */}
+                <Modal
+                    visible={transactionModalVisible}
+                    animationType="slide"
+                    presentationStyle="pageSheet"
+                    onRequestClose={() => setTransactionModalVisible(false)}
+                >
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.modalContainer}
+                    >
+                        <SafeAreaView style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <TouchableOpacity
+                                    onPress={() => setTransactionModalVisible(false)}
+                                    style={styles.modalCloseButton}
+                                >
+                                    <Text style={styles.modalCloseText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.modalTitle}>
+                                    {transactionType === 'payment' ? 'Add Payment' : 'Add Borrowed'}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={handleSaveTransaction}
+                                    style={styles.modalSaveButton}
+                                    disabled={savingTransaction}
+                                >
+                                    {savingTransaction ? (
+                                        <ActivityIndicator size="small" color="#007AFF" />
+                                    ) : (
+                                        <Text style={styles.modalSaveText}>Save</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView style={styles.modalScrollView}>
+                                {transactionDebt && (
+                                    <View style={styles.modalDebtInfo}>
+                                        <Text style={styles.modalDebtName}>{transactionDebt.name}</Text>
+                                        <Text style={styles.modalDebtBalance}>
+                                            Current Balance: {formatCurrencyAmount(transactionDebt.current_balance, transactionDebt.currency_code || 'USD')}
+                                        </Text>
+                                        {transactionDebt.interest_rate && transactionDebt.interest_rate > 0 && transactionType === 'borrow' && (
+                                            <Text style={styles.modalInterestNote}>
+                                                APR: {transactionDebt.interest_rate}% (interest will be calculated)
+                                            </Text>
+                                        )}
+                                    </View>
+                                )}
+
+                                {/* Transaction Type Toggle */}
+                                <View style={styles.formSection}>
+                                    <Text style={styles.formLabel}>Transaction Type</Text>
+                                    <View style={styles.typeToggle}>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.typeButton,
+                                                transactionType === 'payment' && styles.typeButtonPayment
+                                            ]}
+                                            onPress={() => setTransactionType('payment')}
+                                        >
+                                            <Text style={[
+                                                styles.typeButtonText,
+                                                transactionType === 'payment' && styles.typeButtonTextActive
+                                            ]}>
+                                                💵 Pay Off
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.typeButton,
+                                                transactionType === 'borrow' && styles.typeButtonBorrow
+                                            ]}
+                                            onPress={() => setTransactionType('borrow')}
+                                        >
+                                            <Text style={[
+                                                styles.typeButtonText,
+                                                transactionType === 'borrow' && styles.typeButtonTextActive
+                                            ]}>
+                                                💳 Borrow
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Amount Input */}
+                                <View style={styles.formSection}>
+                                    <Text style={styles.formLabel}>Amount</Text>
+                                    <View style={styles.amountInputContainer}>
+                                        <Text style={styles.currencySymbol}>
+                                            {getCurrencyByCode(transactionDebt?.currency_code || 'USD').symbol}
+                                        </Text>
+                                        <TextInput
+                                            style={styles.amountInput}
+                                            placeholder="0.00"
+                                            placeholderTextColor="#666"
+                                            keyboardType="decimal-pad"
+                                            value={transactionAmount}
+                                            onChangeText={setTransactionAmount}
+                                            autoFocus
+                                        />
+                                    </View>
+                                </View>
+
+                                {/* Notes Input */}
+                                <View style={styles.formSection}>
+                                    <Text style={styles.formLabel}>Notes (Optional)</Text>
+                                    <TextInput
+                                        style={styles.notesInput}
+                                        placeholder="e.g., Monthly payment, Extra borrowed for..."
+                                        placeholderTextColor="#666"
+                                        value={transactionNotes}
+                                        onChangeText={setTransactionNotes}
+                                        multiline
+                                        numberOfLines={2}
+                                    />
+                                </View>
+                            </ScrollView>
+                        </SafeAreaView>
+                    </KeyboardAvoidingView>
+                </Modal>
             </SafeAreaView>
         </GestureHandlerRootView>
     );
@@ -547,11 +841,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: '#2C2C2E',
+        backgroundColor: '#1C1C1E',
     },
-    ledgerRowLast: {
-        borderBottomWidth: 0,
+    ledgerRowExpanded: {
+        backgroundColor: '#252528',
     },
     ledgerDebtInfo: {
         flex: 2,
@@ -600,10 +893,14 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#FF3B30',
     },
-    ledgerMinPayment: {
-        fontSize: 11,
+    expandIndicator: {
+        fontSize: 10,
         color: '#8E8E93',
         marginTop: 2,
+    },
+    debtDivider: {
+        height: 1,
+        backgroundColor: '#2C2C2E',
     },
     ledgerFooter: {
         flexDirection: 'row',
@@ -654,24 +951,273 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 16,
     },
-    // Swipe to delete styles
-    deleteAction: {
+    // Swipe actions
+    swipeActionsContainer: {
+        flexDirection: 'row',
         height: '100%',
-        width: 96,
+    },
+    editAction: {
+        width: 80,
+        backgroundColor: '#007AFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    deleteAction: {
+        width: 80,
         backgroundColor: '#FF3B30',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    deleteButton: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        width: '100%',
-        height: '100%',
-    },
-    deleteButtonText: {
+    actionButtonText: {
         color: '#FFFFFF',
         fontSize: 15,
         fontWeight: '600',
+    },
+    // Transaction history styles
+    transactionContainer: {
+        backgroundColor: '#1A1A1D',
+        padding: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#2C2C2E',
+    },
+    transactionActions: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 12,
+    },
+    paymentButton: {
+        flex: 1,
+        backgroundColor: '#34C75920',
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#34C75940',
+    },
+    paymentButtonText: {
+        color: '#34C759',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    borrowButton: {
+        flex: 1,
+        backgroundColor: '#FF3B3020',
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#FF3B3040',
+    },
+    borrowButtonText: {
+        color: '#FF3B30',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    transactionTitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#8E8E93',
+        textTransform: 'uppercase',
+        marginBottom: 8,
+    },
+    transactionLoading: {
+        paddingVertical: 20,
+    },
+    transactionItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#2C2C2E',
+    },
+    transactionRight: {
+        alignItems: 'flex-end',
+    },
+    transactionLeft: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        flex: 1,
+    },
+    transactionType: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginRight: 8,
+        width: 25,
+    },
+    transactionDate: {
+        fontSize: 13,
+        color: '#FFFFFF',
+    },
+    transactionNotes: {
+        fontSize: 12,
+        color: '#8E8E93',
+        marginTop: 2,
+    },
+    transactionInterest: {
+        fontSize: 11,
+        color: '#FF3B30',
+        marginTop: 2,
+    },
+    transactionAmount: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    transactionRunningBalance: {
+        fontSize: 11,
+        color: '#8E8E93',
+        marginTop: 4,
+        textAlign: 'right',
+    },
+    transactionPayment: {
+        color: '#34C759',
+    },
+    transactionBorrow: {
+        color: '#FF3B30',
+    },
+    transactionInitial: {
+        color: '#FFFFFF', // White for initial balance
+    },
+    noTransactions: {
+        fontSize: 13,
+        color: '#8E8E93',
+        textAlign: 'center',
+        paddingVertical: 16,
+    },
+    // Modal styles
+    modalContainer: {
+        flex: 1,
+        backgroundColor: '#0A0A0F',
+    },
+    modalContent: {
+        flex: 1,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#2C2C2E',
+    },
+    modalCloseButton: {
+        minWidth: 60,
+    },
+    modalCloseText: {
+        color: '#8E8E93',
+        fontSize: 16,
+    },
+    modalTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    modalSaveButton: {
+        minWidth: 60,
+        alignItems: 'flex-end',
+    },
+    modalSaveText: {
+        color: '#007AFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalScrollView: {
+        flex: 1,
+        padding: 20,
+    },
+    modalDebtInfo: {
+        backgroundColor: '#1C1C1E',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+    },
+    modalDebtName: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        marginBottom: 4,
+    },
+    modalDebtBalance: {
+        fontSize: 14,
+        color: '#FF3B30',
+    },
+    modalInterestNote: {
+        fontSize: 12,
+        color: '#8E8E93',
+        marginTop: 4,
+    },
+    formSection: {
+        marginBottom: 24,
+    },
+    formLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#8E8E93',
+        marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    typeToggle: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    typeButton: {
+        flex: 1,
+        backgroundColor: '#1C1C1E',
+        paddingVertical: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+    },
+    typeButtonPayment: {
+        backgroundColor: '#34C75920',
+        borderColor: '#34C759',
+    },
+    typeButtonBorrow: {
+        backgroundColor: '#FF3B3020',
+        borderColor: '#FF3B30',
+    },
+    typeButtonText: {
+        fontSize: 14,
+        color: '#FFFFFF',
+    },
+    typeButtonTextActive: {
+        fontWeight: '600',
+    },
+    amountInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1C1C1E',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+        paddingHorizontal: 16,
+    },
+    currencySymbol: {
+        fontSize: 24,
+        fontWeight: '600',
+        color: '#8E8E93',
+        marginRight: 8,
+    },
+    amountInput: {
+        flex: 1,
+        fontSize: 24,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        paddingVertical: 16,
+    },
+    notesInput: {
+        backgroundColor: '#1C1C1E',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#2C2C2E',
+        padding: 16,
+        fontSize: 16,
+        color: '#FFFFFF',
+        minHeight: 80,
+        textAlignVertical: 'top',
     },
 });
