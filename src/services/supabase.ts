@@ -1,6 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 import { Config } from '../constants/config';
 import { logger } from '../utils';
+
+// Get the redirect URL for auth - works with both Expo Go and standalone apps
+const getAuthRedirectUrl = () => {
+  // This creates the correct URL for the current environment
+  // - Expo Go: exp://192.168.x.x:8081/--/auth/callback
+  // - Standalone: debtmirror://auth/callback
+  return Linking.createURL('auth/callback');
+};
 
 // Initialize Supabase client
 export const supabase = createClient(Config.supabase.url, Config.supabase.anonKey);
@@ -32,10 +41,13 @@ export const authService = {
   // Magic link (email OTP) authentication
   async sendMagicLink(email: string) {
     try {
+      const redirectUrl = getAuthRedirectUrl();
+      logger.info('Magic link redirect URL:', redirectUrl);
+
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: Config.auth?.redirectUrl || 'debtmirror://auth/callback',
+          emailRedirectTo: redirectUrl,
         },
       });
       if (error) throw error;
@@ -79,16 +91,50 @@ export const authService = {
   async signInWithOAuth(provider: 'google' | 'apple') {
     try {
       // Note: This requires deep linking setup and specific platform configuration
+      const redirectUrl = getAuthRedirectUrl();
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: Config.auth?.redirectUrl || 'debtmirror://auth/callback',
+          redirectTo: redirectUrl,
         },
       });
       if (error) throw error;
       return { success: true, data };
     } catch (error) {
       console.error('OAuth error:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Verify email OTP (6-digit code)
+  async verifyEmailOtp(email: string, token: string) {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup',
+      });
+      if (error) throw error;
+      logger.info('Email OTP verified successfully');
+      return { success: true, session: data.session, user: data.user };
+    } catch (error) {
+      console.error('Verify OTP error:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Resend OTP for signup verification
+  async resendOtp(email: string) {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+      if (error) throw error;
+      logger.info('OTP resent to:', email);
+      return { success: true };
+    } catch (error) {
+      console.error('Resend OTP error:', error);
       return { success: false, error };
     }
   },

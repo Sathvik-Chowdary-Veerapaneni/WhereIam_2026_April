@@ -14,13 +14,21 @@ import { useAuth } from '../context';
 import { authService } from '../services';
 import { logger } from '../utils';
 
+type SignupStep = 'form' | 'otp' | 'success';
+
 export const SettingsScreen: React.FC = () => {
-    const { user, signOut, isAdmin, isGuest, guestDaysRemaining, endGuestSession } = useAuth();
+    const { user, signOut, isAdmin, isGuest, guestDaysRemaining } = useAuth();
     const [loading, setLoading] = useState(false);
     const [showCreateAccount, setShowCreateAccount] = useState(false);
+
+    // Signup form state
     const [email, setEmail] = useState('');
-    const [sendingLink, setSendingLink] = useState(false);
-    const [linkSent, setLinkSent] = useState(false);
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [otp, setOtp] = useState('');
+    const [signupStep, setSignupStep] = useState<SignupStep>('form');
+    const [signingUp, setSigningUp] = useState(false);
+    const [verifying, setVerifying] = useState(false);
 
     const handleSignOut = async () => {
         const title = isGuest ? 'End Guest Session' : 'Sign Out';
@@ -53,36 +61,221 @@ export const SettingsScreen: React.FC = () => {
         );
     };
 
-    const handleSendMagicLink = async () => {
+    const validateSignupForm = (): boolean => {
         if (!email.trim()) {
             Alert.alert('Error', 'Please enter your email address');
-            return;
+            return false;
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email.trim())) {
             Alert.alert('Error', 'Please enter a valid email address');
+            return false;
+        }
+
+        if (!password) {
+            Alert.alert('Error', 'Please enter a password');
+            return false;
+        }
+
+        if (password.length < 6) {
+            Alert.alert('Error', 'Password must be at least 6 characters');
+            return false;
+        }
+
+        if (password !== confirmPassword) {
+            Alert.alert('Error', 'Passwords do not match');
+            return false;
+        }
+
+        return true;
+    };
+
+    const handleSignUp = async () => {
+        if (!validateSignupForm()) return;
+
+        setSigningUp(true);
+        try {
+            const { success, error } = await authService.signUp(email.trim(), password);
+
+            if (!success) {
+                throw error || new Error('Failed to create account');
+            }
+
+            // Account created, OTP sent to email
+            setSignupStep('otp');
+            logger.info('Account created, OTP sent to:', email);
+        } catch (error) {
+            const message = (error as Error).message || 'Failed to create account';
+            logger.error('Signup error:', error);
+            Alert.alert('Error', message);
+        } finally {
+            setSigningUp(false);
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (!otp.trim() || otp.length !== 6) {
+            Alert.alert('Error', 'Please enter the 6-digit code from your email');
             return;
         }
 
-        setSendingLink(true);
+        setVerifying(true);
         try {
-            const { success, error } = await authService.sendMagicLink(email.trim());
+            const { success, error } = await authService.verifyEmailOtp(email.trim(), otp.trim());
 
             if (!success) {
-                throw error || new Error('Failed to send verification link');
+                throw error || new Error('Invalid verification code');
             }
 
-            setLinkSent(true);
-            logger.info('Magic link sent from settings');
+            setSignupStep('success');
+            logger.info('Email verified successfully');
+
+            // The auth state change will handle the rest (migration, etc.)
+            Alert.alert(
+                'Success!',
+                'Your account has been verified. Your data is being synced.',
+                [{ text: 'OK' }]
+            );
         } catch (error) {
-            const message = (error as Error).message || 'Failed to send verification link';
-            logger.error('Magic link error:', error);
+            const message = (error as Error).message || 'Failed to verify code';
+            logger.error('OTP verification error:', error);
             Alert.alert('Error', message);
         } finally {
-            setSendingLink(false);
+            setVerifying(false);
         }
     };
+
+    const handleResendOtp = async () => {
+        setSigningUp(true);
+        try {
+            const { success, error } = await authService.resendOtp(email.trim());
+
+            if (!success) {
+                throw error || new Error('Failed to resend code');
+            }
+
+            Alert.alert('Code Sent', 'A new verification code has been sent to your email');
+            logger.info('OTP resent to:', email);
+        } catch (error) {
+            const message = (error as Error).message || 'Failed to resend code';
+            logger.error('Resend OTP error:', error);
+            Alert.alert('Error', message);
+        } finally {
+            setSigningUp(false);
+        }
+    };
+
+    const resetSignupForm = () => {
+        setShowCreateAccount(false);
+        setSignupStep('form');
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        setOtp('');
+    };
+
+    const renderSignupForm = () => (
+        <View style={styles.createAccountForm}>
+            <TextInput
+                style={styles.input}
+                placeholder="Email address"
+                placeholderTextColor="#666"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
+                editable={!signingUp}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Password (min 6 characters)"
+                placeholderTextColor="#666"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                editable={!signingUp}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Confirm password"
+                placeholderTextColor="#666"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                editable={!signingUp}
+            />
+            <TouchableOpacity
+                style={[styles.primaryButton, signingUp && styles.buttonDisabled]}
+                onPress={handleSignUp}
+                disabled={signingUp}
+            >
+                {signingUp ? (
+                    <ActivityIndicator color="#fff" />
+                ) : (
+                    <Text style={styles.primaryButtonText}>Create Account</Text>
+                )}
+            </TouchableOpacity>
+            <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={resetSignupForm}
+            >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+        </View>
+    );
+
+    const renderOtpForm = () => (
+        <View style={styles.otpContainer}>
+            <Text style={styles.otpIcon}>📧</Text>
+            <Text style={styles.otpTitle}>Check Your Email</Text>
+            <Text style={styles.otpSubtitle}>
+                We sent a 6-digit verification code to
+            </Text>
+            <Text style={styles.otpEmail}>{email}</Text>
+
+            <TextInput
+                style={styles.otpInput}
+                placeholder="000000"
+                placeholderTextColor="#666"
+                keyboardType="number-pad"
+                maxLength={6}
+                value={otp}
+                onChangeText={setOtp}
+                editable={!verifying}
+            />
+
+            <TouchableOpacity
+                style={[styles.primaryButton, verifying && styles.buttonDisabled]}
+                onPress={handleVerifyOtp}
+                disabled={verifying}
+            >
+                {verifying ? (
+                    <ActivityIndicator color="#fff" />
+                ) : (
+                    <Text style={styles.primaryButtonText}>Verify Code</Text>
+                )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={styles.resendButton}
+                onPress={handleResendOtp}
+                disabled={signingUp}
+            >
+                <Text style={styles.resendButtonText}>
+                    {signingUp ? 'Sending...' : "Didn't receive code? Resend"}
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={resetSignupForm}
+            >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+        </View>
+    );
 
     return (
         <SafeAreaView style={styles.container}>
@@ -116,60 +309,11 @@ export const SettingsScreen: React.FC = () => {
                                         Create Account
                                     </Text>
                                 </TouchableOpacity>
-                            ) : linkSent ? (
-                                <View style={styles.linkSentContainer}>
-                                    <Text style={styles.linkSentIcon}>📧</Text>
-                                    <Text style={styles.linkSentTitle}>Check Your Email</Text>
-                                    <Text style={styles.linkSentText}>
-                                        We sent a verification link to {email}
-                                    </Text>
-                                    <TouchableOpacity
-                                        style={styles.resendButton}
-                                        onPress={handleSendMagicLink}
-                                        disabled={sendingLink}
-                                    >
-                                        <Text style={styles.resendButtonText}>
-                                            {sendingLink ? 'Sending...' : 'Resend Link'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            ) : (
-                                <View style={styles.createAccountForm}>
-                                    <TextInput
-                                        style={styles.emailInput}
-                                        placeholder="Enter your email"
-                                        placeholderTextColor="#666"
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                        value={email}
-                                        onChangeText={setEmail}
-                                        editable={!sendingLink}
-                                    />
-                                    <TouchableOpacity
-                                        style={[styles.sendLinkButton, sendingLink && styles.buttonDisabled]}
-                                        onPress={handleSendMagicLink}
-                                        disabled={sendingLink}
-                                    >
-                                        {sendingLink ? (
-                                            <ActivityIndicator color="#fff" />
-                                        ) : (
-                                            <Text style={styles.sendLinkButtonText}>
-                                                Send Verification Link
-                                            </Text>
-                                        )}
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.cancelButton}
-                                        onPress={() => {
-                                            setShowCreateAccount(false);
-                                            setEmail('');
-                                        }}
-                                    >
-                                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
+                            ) : signupStep === 'form' ? (
+                                renderSignupForm()
+                            ) : signupStep === 'otp' ? (
+                                renderOtpForm()
+                            ) : null}
                         </View>
                     </View>
                 )}
@@ -426,14 +570,14 @@ const styles = StyleSheet.create({
     createAccountForm: {
         gap: 12,
     },
-    emailInput: {
+    input: {
         backgroundColor: '#2C2C2E',
         borderRadius: 10,
         padding: 14,
         fontSize: 16,
         color: '#FFFFFF',
     },
-    sendLinkButton: {
+    primaryButton: {
         backgroundColor: '#007AFF',
         borderRadius: 10,
         padding: 14,
@@ -442,7 +586,7 @@ const styles = StyleSheet.create({
     buttonDisabled: {
         opacity: 0.6,
     },
-    sendLinkButtonText: {
+    primaryButtonText: {
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
@@ -455,32 +599,49 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#8E8E93',
     },
-    linkSentContainer: {
+    // OTP styles
+    otpContainer: {
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 8,
     },
-    linkSentIcon: {
-        fontSize: 40,
+    otpIcon: {
+        fontSize: 48,
         marginBottom: 12,
     },
-    linkSentTitle: {
-        fontSize: 17,
+    otpTitle: {
+        fontSize: 20,
         fontWeight: '600',
         color: '#FFFFFF',
         marginBottom: 8,
     },
-    linkSentText: {
+    otpSubtitle: {
         fontSize: 14,
         color: '#8E8E93',
         textAlign: 'center',
+    },
+    otpEmail: {
+        fontSize: 14,
+        color: '#007AFF',
+        fontWeight: '600',
+        marginBottom: 20,
+    },
+    otpInput: {
+        backgroundColor: '#2C2C2E',
+        borderRadius: 10,
+        padding: 16,
+        fontSize: 24,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        textAlign: 'center',
+        letterSpacing: 8,
+        width: '80%',
         marginBottom: 16,
     },
     resendButton: {
-        padding: 10,
+        padding: 12,
     },
     resendButtonText: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#007AFF',
-        fontWeight: '500',
     },
 });
