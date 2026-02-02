@@ -39,6 +39,7 @@ export const DashboardScreen: React.FC = () => {
     const [avgInterestRate, setAvgInterestRate] = useState(0);
     const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
     const [totalMonthlyIncome, setTotalMonthlyIncome] = useState(0);
+    const [showGuestBanner, setShowGuestBanner] = useState(true);
 
     const fetchData = useCallback(async () => {
         try {
@@ -170,22 +171,28 @@ export const DashboardScreen: React.FC = () => {
                     />
                 }
             >
-                {/* Guest Mode Banner */}
-                {isGuest && (
-                    <TouchableOpacity
-                        style={styles.guestBanner}
-                        onPress={() => navigation.navigate('Settings')}
-                    >
-                        <View style={styles.guestBannerContent}>
+                {/* Guest Mode Banner - Dismissible */}
+                {isGuest && showGuestBanner && (
+                    <View style={styles.guestBanner}>
+                        <TouchableOpacity
+                            style={styles.guestBannerContent}
+                            onPress={() => navigation.navigate('Settings')}
+                        >
                             <Text style={styles.guestBannerText}>
                                 Guest Mode • {guestDaysRemaining} days remaining
                             </Text>
                             <Text style={styles.guestBannerSubtext}>
                                 Tap to create an account and save your data
                             </Text>
-                        </View>
-                        <Text style={styles.guestBannerArrow}>›</Text>
-                    </TouchableOpacity>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.guestBannerClose}
+                            onPress={() => setShowGuestBanner(false)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Text style={styles.guestBannerCloseText}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
 
                 {/* Header */}
@@ -366,11 +373,14 @@ const styles = StyleSheet.create({
         fontSize: 13,
         marginTop: 2,
     },
-    guestBannerArrow: {
-        color: '#FFFFFF',
-        fontSize: 24,
-        fontWeight: '300',
+    guestBannerClose: {
+        padding: 4,
         marginLeft: 8,
+    },
+    guestBannerCloseText: {
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: 18,
+        fontWeight: '500',
     },
     scrollView: {
         flex: 1,
