@@ -10,7 +10,8 @@ import {
     ScrollView,
     TextInput,
 } from 'react-native';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
+import type { ThemeMode, ThemeColors } from '../context';
 import { authService } from '../services';
 import { logger } from '../utils';
 
@@ -18,6 +19,7 @@ type SignupStep = 'form' | 'otp' | 'success';
 
 export const SettingsScreen: React.FC = () => {
     const { user, signOut, isAdmin, isGuest, guestDaysRemaining } = useAuth();
+    const { theme, setTheme, colors } = useTheme();
     const [loading, setLoading] = useState(false);
     const [showCreateAccount, setShowCreateAccount] = useState(false);
 
@@ -29,6 +31,8 @@ export const SettingsScreen: React.FC = () => {
     const [signupStep, setSignupStep] = useState<SignupStep>('form');
     const [signingUp, setSigningUp] = useState(false);
     const [verifying, setVerifying] = useState(false);
+
+    const styles = createStyles(colors);
 
     const handleSignOut = async () => {
         const title = isGuest ? 'End Guest Session' : 'Sign Out';
@@ -59,6 +63,15 @@ export const SettingsScreen: React.FC = () => {
                 },
             ]
         );
+    };
+
+    const handleThemeChange = async (newTheme: ThemeMode) => {
+        try {
+            await setTheme(newTheme);
+        } catch (error) {
+            logger.error('Failed to change theme:', error);
+            Alert.alert('Error', 'Failed to change theme. Please try again.');
+        }
     };
 
     const validateSignupForm = (): boolean => {
@@ -180,7 +193,7 @@ export const SettingsScreen: React.FC = () => {
             <TextInput
                 style={styles.input}
                 placeholder="Email address"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.placeholder}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -191,7 +204,7 @@ export const SettingsScreen: React.FC = () => {
             <TextInput
                 style={styles.input}
                 placeholder="Password (min 6 characters)"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.placeholder}
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
@@ -200,7 +213,7 @@ export const SettingsScreen: React.FC = () => {
             <TextInput
                 style={styles.input}
                 placeholder="Confirm password"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.placeholder}
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -238,7 +251,7 @@ export const SettingsScreen: React.FC = () => {
             <TextInput
                 style={styles.otpInput}
                 placeholder="000000"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.placeholder}
                 keyboardType="number-pad"
                 maxLength={6}
                 value={otp}
@@ -276,6 +289,26 @@ export const SettingsScreen: React.FC = () => {
             </TouchableOpacity>
         </View>
     );
+
+    const renderThemeOption = (mode: ThemeMode, label: string, icon: string) => {
+        const isSelected = theme === mode;
+        return (
+            <TouchableOpacity
+                style={[styles.themeOption, isSelected && styles.themeOptionSelected]}
+                onPress={() => handleThemeChange(mode)}
+            >
+                <Text style={styles.themeOptionIcon}>{icon}</Text>
+                <Text style={[styles.themeOptionLabel, isSelected && styles.themeOptionLabelSelected]}>
+                    {label}
+                </Text>
+                {isSelected && (
+                    <View style={styles.themeCheckmark}>
+                        <Text style={styles.themeCheckmarkText}>✓</Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -354,6 +387,18 @@ export const SettingsScreen: React.FC = () => {
                     </View>
                 </View>
 
+                {/* Appearance Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Appearance</Text>
+                    <View style={styles.card}>
+                        <View style={styles.themeSelector}>
+                            {renderThemeOption('light', 'Light', '☀️')}
+                            {renderThemeOption('dark', 'Dark', '🌙')}
+                            {renderThemeOption('system', 'System', '⚙️')}
+                        </View>
+                    </View>
+                </View>
+
                 {/* App Info Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>About</Text>
@@ -378,7 +423,7 @@ export const SettingsScreen: React.FC = () => {
                         disabled={loading}
                     >
                         {loading ? (
-                            <ActivityIndicator color="#FF3B30" />
+                            <ActivityIndicator color={colors.error} />
                         ) : (
                             <Text style={styles.signOutText}>
                                 {isGuest ? 'End Guest Session' : 'Sign Out'}
@@ -391,10 +436,10 @@ export const SettingsScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     scrollView: {
         flex: 1,
@@ -409,17 +454,17 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         marginBottom: 12,
         marginLeft: 4,
     },
     card: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
         overflow: 'hidden',
     },
     profileRow: {
@@ -431,18 +476,18 @@ const styles = StyleSheet.create({
         width: 52,
         height: 52,
         borderRadius: 26,
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.avatarBackground,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 16,
     },
     avatarGuest: {
-        backgroundColor: '#FF9500',
+        backgroundColor: colors.avatarGuestBackground,
     },
     avatarText: {
         fontSize: 22,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.textInverse,
     },
     profileInfo: {
         flex: 1,
@@ -450,12 +495,12 @@ const styles = StyleSheet.create({
     profileEmail: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 4,
     },
     profileId: {
         fontSize: 13,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     emailRow: {
         flexDirection: 'row',
@@ -464,7 +509,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     adminBadge: {
-        backgroundColor: '#FFD60A',
+        backgroundColor: colors.adminBadgeBackground,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 4,
@@ -472,10 +517,10 @@ const styles = StyleSheet.create({
     adminBadgeText: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#000000',
+        color: colors.adminBadgeText,
     },
     guestBadge: {
-        backgroundColor: '#FF9500',
+        backgroundColor: colors.guestBadgeBackground,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 4,
@@ -483,7 +528,51 @@ const styles = StyleSheet.create({
     guestBadgeText: {
         fontSize: 10,
         fontWeight: '700',
+        color: colors.guestBadgeText,
+    },
+    // Theme selector styles
+    themeSelector: {
+        flexDirection: 'row',
+        padding: 8,
+        gap: 8,
+    },
+    themeOption: {
+        flex: 1,
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 10,
+        backgroundColor: colors.cardSecondary,
+    },
+    themeOptionSelected: {
+        backgroundColor: colors.primary,
+    },
+    themeOptionIcon: {
+        fontSize: 24,
+        marginBottom: 6,
+    },
+    themeOptionLabel: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: colors.text,
+    },
+    themeOptionLabelSelected: {
         color: '#FFFFFF',
+    },
+    themeCheckmark: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    themeCheckmarkText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.primary,
     },
     infoRow: {
         flexDirection: 'row',
@@ -493,24 +582,24 @@ const styles = StyleSheet.create({
     },
     infoLabel: {
         fontSize: 16,
-        color: '#FFFFFF',
+        color: colors.text,
     },
     infoValue: {
         fontSize: 16,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     divider: {
         height: 1,
-        backgroundColor: '#2C2C2E',
+        backgroundColor: colors.borderLight,
         marginLeft: 16,
     },
     signOutButton: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#3A2020',
+        borderColor: colors.errorBackground,
     },
     signOutButtonDisabled: {
         opacity: 0.6,
@@ -518,15 +607,15 @@ const styles = StyleSheet.create({
     signOutText: {
         fontSize: 17,
         fontWeight: '600',
-        color: '#FF3B30',
+        color: colors.error,
     },
     // Guest upgrade styles
     guestUpgradeCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 20,
         borderWidth: 1,
-        borderColor: '#FF9500',
+        borderColor: colors.warning,
     },
     guestUpgradeHeader: {
         flexDirection: 'row',
@@ -543,21 +632,21 @@ const styles = StyleSheet.create({
     guestUpgradeTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     guestUpgradeSubtitle: {
         fontSize: 14,
-        color: '#FF9500',
+        color: colors.warning,
         fontWeight: '500',
     },
     guestUpgradeText: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         lineHeight: 20,
         marginBottom: 16,
     },
     createAccountButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.primary,
         borderRadius: 10,
         padding: 14,
         alignItems: 'center',
@@ -571,14 +660,14 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     input: {
-        backgroundColor: '#2C2C2E',
+        backgroundColor: colors.inputBackground,
         borderRadius: 10,
         padding: 14,
         fontSize: 16,
-        color: '#FFFFFF',
+        color: colors.text,
     },
     primaryButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.primary,
         borderRadius: 10,
         padding: 14,
         alignItems: 'center',
@@ -597,7 +686,7 @@ const styles = StyleSheet.create({
     },
     cancelButtonText: {
         fontSize: 15,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     // OTP styles
     otpContainer: {
@@ -611,27 +700,27 @@ const styles = StyleSheet.create({
     otpTitle: {
         fontSize: 20,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     otpSubtitle: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
     },
     otpEmail: {
         fontSize: 14,
-        color: '#007AFF',
+        color: colors.primary,
         fontWeight: '600',
         marginBottom: 20,
     },
     otpInput: {
-        backgroundColor: '#2C2C2E',
+        backgroundColor: colors.inputBackground,
         borderRadius: 10,
         padding: 16,
         fontSize: 24,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         textAlign: 'center',
         letterSpacing: 8,
         width: '80%',
@@ -642,6 +731,6 @@ const styles = StyleSheet.create({
     },
     resendButtonText: {
         fontSize: 14,
-        color: '#007AFF',
+        color: colors.primary,
     },
 });
