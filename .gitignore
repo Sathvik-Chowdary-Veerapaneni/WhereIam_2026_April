@@ -106,3 +106,6 @@ dist
 # Database schemas (keep local only)
 *.sql
 migrations/
+
+# Claude Code
+CLAUDE.md
