@@ -12,7 +12,8 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { debtsService, Debt } from '../services/debts';
 import { incomeService, IncomeSource } from '../services/incomeService';
 import { localStorageService, LocalDebt, LocalIncome } from '../services';
@@ -30,6 +31,7 @@ interface CurrencyTotal {
 export const DashboardScreen: React.FC = () => {
     const navigation = useNavigation<DashboardNavigationProp>();
     const { user, isGuest, guestDaysRemaining } = useAuth();
+    const { colors } = useTheme();
 
     const [debts, setDebts] = useState<Debt[]>([]);
     const [loading, setLoading] = useState(true);
@@ -40,6 +42,8 @@ export const DashboardScreen: React.FC = () => {
     const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
     const [totalMonthlyIncome, setTotalMonthlyIncome] = useState(0);
     const [showGuestBanner, setShowGuestBanner] = useState(true);
+
+    const styles = createStyles(colors);
 
     const fetchData = useCallback(async () => {
         try {
@@ -151,7 +155,7 @@ export const DashboardScreen: React.FC = () => {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#007AFF" />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             </SafeAreaView>
         );
@@ -167,7 +171,7 @@ export const DashboardScreen: React.FC = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor="#007AFF"
+                        tintColor={colors.primary}
                     />
                 }
             >
@@ -342,10 +346,10 @@ export const DashboardScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -353,7 +357,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     guestBanner: {
-        backgroundColor: '#FF9500',
+        backgroundColor: colors.warning,
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
@@ -397,17 +401,17 @@ const styles = StyleSheet.create({
     },
     greeting: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     userName: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     settingsButton: {
         width: 44,
         height: 44,
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 22,
         alignItems: 'center',
         justifyContent: 'center',
@@ -416,18 +420,18 @@ const styles = StyleSheet.create({
         fontSize: 20,
     },
     characterCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 16,
         padding: 24,
         alignItems: 'center',
         marginBottom: 24,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     characterPlaceholder: {
         width: 100,
         height: 100,
-        backgroundColor: '#2C2C2E',
+        backgroundColor: colors.cardSecondary,
         borderRadius: 50,
         alignItems: 'center',
         justifyContent: 'center',
@@ -439,18 +443,18 @@ const styles = StyleSheet.create({
     characterTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 4,
     },
     characterSubtitle: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 16,
     },
     statsGrid: {
@@ -460,28 +464,28 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     statCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         width: '48%',
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     statCardClickable: {
-        borderColor: '#3A3A3C',
+        borderColor: colors.border,
     },
     statCardLarge: {
         width: '48%',
     },
     statLabel: {
         fontSize: 13,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginBottom: 8,
     },
     statValue: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     statValueRow: {
         flexDirection: 'row',
@@ -490,16 +494,16 @@ const styles = StyleSheet.create({
     },
     chevron: {
         fontSize: 20,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginLeft: 8,
     },
     statValueLarge: {
         fontSize: 22,
         fontWeight: '700',
-        color: '#34C759',
+        color: colors.success,
     },
     statValueRed: {
-        color: '#FF3B30',
+        color: colors.error,
     },
     actionsContainer: {
         flexDirection: 'row',
@@ -508,12 +512,12 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         flex: 1,
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     actionIcon: {
         fontSize: 24,
@@ -521,7 +525,7 @@ const styles = StyleSheet.create({
     },
     actionText: {
         fontSize: 13,
-        color: '#FFFFFF',
+        color: colors.text,
         fontWeight: '500',
     },
 
@@ -536,18 +540,18 @@ const styles = StyleSheet.create({
     emptyTitle: {
         fontSize: 20,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     emptySubtitle: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
         marginBottom: 24,
         paddingHorizontal: 20,
     },
     emptyButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.primary,
         paddingVertical: 14,
         paddingHorizontal: 24,
         borderRadius: 12,
@@ -564,11 +568,11 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     currencyTotalCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 16,
         padding: 16,
         borderWidth: 1,
-        borderColor: '#FF6B6B40',
+        borderColor: colors.errorBackground,
     },
     currencyTotalHeader: {
         flexDirection: 'row',
@@ -581,7 +585,7 @@ const styles = StyleSheet.create({
     },
     currencyEditText: {
         fontSize: 13,
-        color: '#007AFF',
+        color: colors.primary,
         fontWeight: '500',
     },
     currencyFlag: {
@@ -590,28 +594,28 @@ const styles = StyleSheet.create({
     currencyCode: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         letterSpacing: 0.5,
     },
     currencyTotalBalance: {
         fontSize: 28,
         fontWeight: '700',
-        color: '#FF6B6B',
+        color: colors.error,
         marginBottom: 4,
     },
     currencyTotalSubtext: {
         fontSize: 13,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
 
     // Income section styles - matching debt by currency design
     incomeTotalCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 16,
         padding: 16,
         marginBottom: 24,
         borderWidth: 1,
-        borderColor: '#34C75940',
+        borderColor: colors.successBackground,
     },
     incomeTotalHeader: {
         flexDirection: 'row',
@@ -625,7 +629,7 @@ const styles = StyleSheet.create({
     incomeTypeLabel: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         letterSpacing: 0.5,
     },
     incomeEditBadge: {
@@ -633,17 +637,17 @@ const styles = StyleSheet.create({
     },
     incomeEditBadgeText: {
         fontSize: 13,
-        color: '#007AFF',
+        color: colors.primary,
         fontWeight: '500',
     },
     incomeTotalAmount: {
         fontSize: 28,
         fontWeight: '700',
-        color: '#34C759',
+        color: colors.success,
         marginBottom: 4,
     },
     incomeTotalSubtext: {
         fontSize: 13,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
 });
