@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
 import {
   AuthScreen,
   OnboardingScreen,
@@ -20,24 +20,16 @@ import {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// Loading screen while checking auth state
-const LoadingScreen = () => (
-  <View style={styles.loadingContainer}>
-    <ActivityIndicator size="large" color="#007AFF" />
-  </View>
-);
-
-// Guest banner component
-const GuestBanner: React.FC<{ daysRemaining: number }> = ({ daysRemaining }) => (
-  <View style={styles.guestBanner}>
-    <Text style={styles.guestBannerText}>
-      Guest Mode • {daysRemaining} days remaining
-    </Text>
-  </View>
-);
-
 export const RootNavigator: React.FC = () => {
-  const { session, isLoading, isOnboarded, isGuest, guestDaysRemaining } = useAuth();
+  const { session, isLoading, isOnboarded, isGuest } = useAuth();
+  const { isDark, colors } = useTheme();
+
+  // Loading screen while checking auth state
+  const LoadingScreen = () => (
+    <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -46,21 +38,35 @@ export const RootNavigator: React.FC = () => {
   // User is authenticated (has session) OR is in guest mode
   const isAuthenticated = session !== null || isGuest;
 
+  // Custom navigation theme based on app theme
+  const navigationTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: colors.border,
+      notification: colors.primary,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator
         screenOptions={{
           headerShown: true,
           headerBackTitleVisible: false,
           headerStyle: {
-            backgroundColor: '#0A0A0F',
+            backgroundColor: colors.background,
           },
-          headerTintColor: '#FFFFFF',
+          headerTintColor: colors.text,
           headerTitleStyle: {
             fontWeight: '600',
           },
           contentStyle: {
-            backgroundColor: '#0A0A0F',
+            backgroundColor: colors.background,
           },
         }}
       >
@@ -171,7 +177,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0A0A0F',
   },
   guestBanner: {
     backgroundColor: '#FF9500',
