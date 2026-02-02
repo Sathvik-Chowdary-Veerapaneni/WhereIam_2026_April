@@ -10,4 +10,5 @@ export { debtTransactionsService } from './debtTransactions';
 export type { DebtTransaction, CreateTransactionInput } from './debtTransactions';
 export { localStorageService } from './localStorage';
 export type { GuestSession, LocalDebt, LocalIncome, LocalTransaction } from './localStorage';
+export { migrationService } from './migrationService';
 

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, authService, localStorageService } from '../services';
+import { supabase, authService, localStorageService, migrationService } from '../services';
 import type { GuestSession } from '../services';
 import { logger } from '../utils';
 
@@ -216,10 +216,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                         setIsOnboarded(data && data.length > 0);
                     }
 
-                    // Clear any guest session since user is now authenticated
+                    // Migrate guest data to Supabase if exists, then clear local data
                     const guestExists = await localStorageService.getGuestSession();
                     if (guestExists) {
-                        await localStorageService.clearGuestSession();
+                        const hasData = await migrationService.hasDataToMigrate();
+                        if (hasData) {
+                            logger.info('Migrating guest data to Supabase...');
+                            const result = await migrationService.migrateToSupabase(session.user.id);
+                            if (result.success) {
+                                logger.info('Guest data migrated successfully');
+                            } else {
+                                logger.error('Guest data migration failed:', result.error);
+                            }
+                        } else {
+                            await localStorageService.clearGuestSession();
+                        }
                     }
                 } else {
                     // No authenticated session, check for guest session
@@ -242,9 +253,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
-                    // User signed in - end guest mode if active
-                    if (isGuest) {
-                        // Note: We don't clear guest data here in case user wants to migrate it
+                    // User signed in - migrate guest data if active
+                    const guestExists = await localStorageService.getGuestSession();
+                    if (guestExists) {
+                        const hasData = await migrationService.hasDataToMigrate();
+                        if (hasData) {
+                            logger.info('Migrating guest data on sign in...');
+                            const result = await migrationService.migrateToSupabase(session.user.id);
+                            if (result.success) {
+                                logger.info('Guest data migrated successfully on sign in');
+                            } else {
+                                logger.error('Guest data migration failed on sign in:', result.error);
+                            }
+                        } else {
+                            await localStorageService.clearGuestSession();
+                        }
                         setIsGuest(false);
                         setGuestSession(null);
                     }
