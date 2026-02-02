@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Alert, Linking } from 'react-native';
 import { RootNavigator } from './src/navigation/RootNavigator';
-import { AuthProvider } from './src/context';
+import { AuthProvider, ThemeProvider } from './src/context';
 import { revenueCatService, analyticsService, authService, supabase } from './src/services';
 import { logger } from './src/utils';
 
@@ -124,8 +124,10 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
