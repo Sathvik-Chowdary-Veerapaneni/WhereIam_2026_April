@@ -327,12 +327,21 @@ export const DebtLedgerScreen: React.FC = () => {
                         }
 
                         try {
-                            const { success, error } = await debtsService.deleteDebt(debt.id);
-                            if (!success) {
-                                throw error || new Error('Failed to delete debt');
+                            if (isGuest) {
+                                // Delete from local storage for guest users
+                                const success = await localStorageService.deleteLocalDebt(debt.id);
+                                if (!success) {
+                                    throw new Error('Failed to delete debt');
+                                }
+                                logger.info(`Local debt deleted: ${debt.name}`);
+                            } else {
+                                // Delete from Supabase for authenticated users
+                                const { success, error } = await debtsService.deleteDebt(debt.id);
+                                if (!success) {
+                                    throw error || new Error('Failed to delete debt');
+                                }
+                                logger.info(`Debt deleted: ${debt.name}`);
                             }
-
-                            logger.info(`Debt deleted: ${debt.name}`);
                             await fetchData();
                         } catch (error) {
                             logger.error('Delete debt error:', error);
@@ -347,7 +356,7 @@ export const DebtLedgerScreen: React.FC = () => {
                 },
             ]
         );
-    }, [closeSwipeable, debts, totalsByCurrency, totalDebts, fetchData]);
+    }, [closeSwipeable, debts, totalsByCurrency, totalDebts, fetchData, isGuest]);
 
     // Render swipe actions: Edit (blue) + Delete (red)
     const renderRightActions = useCallback((
