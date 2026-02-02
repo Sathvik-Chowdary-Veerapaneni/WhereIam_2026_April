@@ -148,6 +148,7 @@ export const DebtLedgerScreen: React.FC = () => {
                 const formattedTxns: DebtTransaction[] = localTxns.map(t => ({
                     ...t,
                     user_id: 'guest',
+                    type: t.type as 'payment' | 'borrow' | 'initial',
                 }));
                 setTransactions(prev => ({ ...prev, [debtId]: formattedTxns }));
             } else {

@@ -16,6 +16,7 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context';
 import { incomeService, IncomeSource, CreateIncomeInput } from '../services/incomeService';
+import { localStorageService } from '../services';
 import { logger } from '../utils';
 
 const PROFESSIONS = [
@@ -47,7 +48,7 @@ const getIncomeTypeInfo = (type: string) => {
 
 export const EditProfileScreen: React.FC = () => {
     const navigation = useNavigation();
-    const { user } = useAuth();
+    const { user, isGuest } = useAuth();
     const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -61,19 +62,37 @@ export const EditProfileScreen: React.FC = () => {
     const [formDescription, setFormDescription] = useState<string>('');
 
     const loadIncomeSources = useCallback(async () => {
-        if (!user) return;
-
         try {
             setLoading(true);
-            const sources = await incomeService.getAll(user.id);
-            setIncomeSources(sources);
+            if (isGuest) {
+                // Load from local storage for guest users
+                const localIncome = await localStorageService.getLocalIncome();
+                const formattedIncome: IncomeSource[] = localIncome.map(i => ({
+                    id: i.id,
+                    user_id: 'guest',
+                    profession: i.source_name,
+                    income_type: i.is_primary ? 'primary' : 'other',
+                    amount: i.amount,
+                    currency_code: i.currency_code,
+                    frequency: i.frequency,
+                    monthly_amount: i.amount,
+                    description: '',
+                    created_at: i.created_at,
+                    updated_at: i.updated_at,
+                }));
+                setIncomeSources(formattedIncome);
+            } else if (user) {
+                // Load from Supabase for authenticated users
+                const sources = await incomeService.getAll(user.id);
+                setIncomeSources(sources);
+            }
         } catch (error) {
             logger.error('Error loading income sources:', error);
             Alert.alert('Error', 'Failed to load income sources');
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, isGuest]);
 
     useFocusEffect(
         useCallback(() => {
@@ -120,31 +139,55 @@ export const EditProfileScreen: React.FC = () => {
             return;
         }
 
-        if (!user) {
+        if (!user && !isGuest) {
             Alert.alert('Error', 'User not found');
             return;
         }
 
         setSaving(true);
         try {
-            if (editingSource) {
-                // Update existing
-                await incomeService.update(editingSource.id, {
-                    profession: formProfession,
-                    monthly_amount: amount,
-                    income_type: formType as CreateIncomeInput['income_type'],
-                    description: formDescription || undefined,
-                });
-                logger.info('Income source updated');
-            } else {
-                // Create new
-                await incomeService.create(user.id, {
-                    profession: formProfession,
-                    monthly_amount: amount,
-                    income_type: formType as CreateIncomeInput['income_type'],
-                    description: formDescription || undefined,
-                });
-                logger.info('Income source created');
+            if (isGuest) {
+                // Save to local storage for guest users
+                if (editingSource) {
+                    // Update existing
+                    await localStorageService.updateLocalIncome(editingSource.id, {
+                        source_name: formProfession,
+                        amount: amount,
+                        is_primary: formType === 'primary',
+                    });
+                    logger.info('Local income source updated');
+                } else {
+                    // Create new
+                    await localStorageService.saveLocalIncome({
+                        source_name: formProfession,
+                        amount: amount,
+                        currency_code: 'USD',
+                        frequency: 'monthly',
+                        is_primary: formType === 'primary',
+                    });
+                    logger.info('Local income source created');
+                }
+            } else if (user) {
+                // Save to Supabase for authenticated users
+                if (editingSource) {
+                    // Update existing
+                    await incomeService.update(editingSource.id, {
+                        profession: formProfession,
+                        monthly_amount: amount,
+                        income_type: formType as CreateIncomeInput['income_type'],
+                        description: formDescription || undefined,
+                    });
+                    logger.info('Income source updated');
+                } else {
+                    // Create new
+                    await incomeService.create(user.id, {
+                        profession: formProfession,
+                        monthly_amount: amount,
+                        income_type: formType as CreateIncomeInput['income_type'],
+                        description: formDescription || undefined,
+                    });
+                    logger.info('Income source created');
+                }
             }
 
             setModalVisible(false);
@@ -174,8 +217,15 @@ export const EditProfileScreen: React.FC = () => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await incomeService.delete(source.id);
-                            logger.info('Income source deleted');
+                            if (isGuest) {
+                                // Delete from local storage for guest users
+                                await localStorageService.deleteLocalIncome(source.id);
+                                logger.info('Local income source deleted');
+                            } else {
+                                // Delete from Supabase for authenticated users
+                                await incomeService.delete(source.id);
+                                logger.info('Income source deleted');
+                            }
                             await loadIncomeSources();
                         } catch (error) {
                             logger.error('Error deleting income source:', error);

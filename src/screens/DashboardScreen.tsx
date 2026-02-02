@@ -84,10 +84,13 @@ export const DashboardScreen: React.FC = () => {
                 setIncomeSources(localIncome.map(i => ({
                     id: i.id,
                     user_id: 'guest',
-                    source_name: i.source_name,
-                    monthly_amount: i.amount,
+                    profession: i.source_name,
+                    income_type: i.is_primary ? 'primary' : 'other',
+                    amount: i.amount,
                     currency_code: i.currency_code,
-                    is_primary: i.is_primary,
+                    frequency: i.frequency,
+                    monthly_amount: i.amount,
+                    description: '',
                     created_at: i.created_at,
                     updated_at: i.updated_at,
                 })));

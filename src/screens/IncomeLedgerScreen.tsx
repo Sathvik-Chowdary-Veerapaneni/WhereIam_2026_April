@@ -18,6 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context';
 import { incomeService, IncomeSource } from '../services/incomeService';
+import { localStorageService } from '../services';
 import { logger } from '../utils';
 
 type IncomeLedgerNavigationProp = NativeStackNavigationProp<RootStackParamList, 'IncomeLedger'>;
@@ -53,7 +54,7 @@ const getProfessionLabel = (value: string): string => {
 
 export const IncomeLedgerScreen: React.FC = () => {
     const navigation = useNavigation<IncomeLedgerNavigationProp>();
-    const { user } = useAuth();
+    const { user, isGuest } = useAuth();
 
     const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
     const [loading, setLoading] = useState(true);
@@ -61,20 +62,40 @@ export const IncomeLedgerScreen: React.FC = () => {
     const [totalMonthlyIncome, setTotalMonthlyIncome] = useState(0);
 
     const fetchData = useCallback(async () => {
-        if (!user) return;
-
         try {
-            const sources = await incomeService.getAll(user.id);
-            setIncomeSources(sources);
-            const total = sources.reduce((sum, s) => sum + s.monthly_amount, 0);
-            setTotalMonthlyIncome(total);
+            if (isGuest) {
+                // Fetch from local storage for guest users
+                const localIncome = await localStorageService.getLocalIncome();
+                const formattedIncome: IncomeSource[] = localIncome.map(i => ({
+                    id: i.id,
+                    user_id: 'guest',
+                    profession: i.source_name,
+                    income_type: i.is_primary ? 'primary' : 'other',
+                    amount: i.amount,
+                    currency_code: i.currency_code,
+                    frequency: i.frequency,
+                    monthly_amount: i.amount, // Assuming amount is already monthly
+                    description: '',
+                    created_at: i.created_at,
+                    updated_at: i.updated_at,
+                }));
+                setIncomeSources(formattedIncome);
+                const total = formattedIncome.reduce((sum, s) => sum + s.monthly_amount, 0);
+                setTotalMonthlyIncome(total);
+            } else if (user) {
+                // Fetch from Supabase for authenticated users
+                const sources = await incomeService.getAll(user.id);
+                setIncomeSources(sources);
+                const total = sources.reduce((sum, s) => sum + s.monthly_amount, 0);
+                setTotalMonthlyIncome(total);
+            }
         } catch (error) {
             logger.error('Income ledger fetch error:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [user]);
+    }, [user, isGuest]);
 
     const handleEditIncome = useCallback((source: IncomeSource) => {
         navigation.navigate('EditProfile');
@@ -137,8 +158,15 @@ export const IncomeLedgerScreen: React.FC = () => {
                         setTotalMonthlyIncome((prev) => Math.max(0, prev - source.monthly_amount));
 
                         try {
-                            await incomeService.delete(source.id);
-                            logger.info(`Income deleted: ${source.profession}`);
+                            if (isGuest) {
+                                // Delete from local storage for guest users
+                                await localStorageService.deleteLocalIncome(source.id);
+                                logger.info(`Local income deleted: ${source.profession}`);
+                            } else {
+                                // Delete from Supabase for authenticated users
+                                await incomeService.delete(source.id);
+                                logger.info(`Income deleted: ${source.profession}`);
+                            }
                             await fetchData();
                         } catch (error) {
                             logger.error('Delete income error:', error);
@@ -150,7 +178,7 @@ export const IncomeLedgerScreen: React.FC = () => {
                 },
             ]
         );
-    }, [closeSwipeable, incomeSources, totalMonthlyIncome, fetchData]);
+    }, [closeSwipeable, incomeSources, totalMonthlyIncome, fetchData, isGuest]);
 
     // Render the delete action for swipe
     const renderRightActions = useCallback((
