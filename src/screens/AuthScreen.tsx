@@ -14,7 +14,8 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { authService } from '../services';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { logger } from '../utils';
 
 // Required for expo-auth-session to work properly
@@ -30,6 +31,8 @@ export const AuthScreen: React.FC = () => {
     const [magicLinkSent, setMagicLinkSent] = useState(false);
 
     const { startGuestSession } = useAuth();
+    const { colors } = useTheme();
+    const styles = createStyles(colors);
 
     // Create redirect URI for OAuth
     const redirectUri = AuthSession.makeRedirectUri({});
@@ -204,7 +207,7 @@ export const AuthScreen: React.FC = () => {
                             <TextInput
                                 style={styles.input}
                                 placeholder="you@example.com"
-                                placeholderTextColor="#999"
+                                placeholderTextColor={colors.placeholder}
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 autoCorrect={false}
@@ -221,7 +224,7 @@ export const AuthScreen: React.FC = () => {
                                 <TextInput
                                     style={styles.input}
                                     placeholder="••••••••"
-                                    placeholderTextColor="#999"
+                                    placeholderTextColor={colors.placeholder}
                                     secureTextEntry
                                     editable={!loading}
                                     value={password}
@@ -321,10 +324,10 @@ export const AuthScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     keyboardView: {
         flex: 1,
@@ -345,12 +348,12 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
     },
     successIcon: {
@@ -360,24 +363,24 @@ const styles = StyleSheet.create({
     emailText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#007AFF',
+        color: colors.primary,
         marginTop: 8,
     },
     instructionsContainer: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 20,
         marginBottom: 24,
     },
     instructionsText: {
         fontSize: 15,
-        color: '#FFFFFF',
+        color: colors.text,
         textAlign: 'center',
         lineHeight: 22,
     },
     instructionsSubtext: {
         fontSize: 13,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
         marginTop: 12,
     },
@@ -390,20 +393,20 @@ const styles = StyleSheet.create({
     inputLabel: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     input: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         paddingVertical: 14,
         paddingHorizontal: 16,
         fontSize: 16,
-        color: '#FFFFFF',
+        color: colors.text,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     button: {
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -422,10 +425,10 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     secondaryButtonText: {
-        color: '#007AFF',
+        color: colors.primary,
         fontSize: 16,
         fontWeight: '500',
     },
@@ -437,7 +440,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     toggleText: {
-        color: '#007AFF',
+        color: colors.primary,
         fontSize: 15,
         fontWeight: '500',
     },
@@ -449,29 +452,29 @@ const styles = StyleSheet.create({
     divider: {
         flex: 1,
         height: 1,
-        backgroundColor: '#2C2C2E',
+        backgroundColor: colors.borderLight,
     },
     dividerText: {
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginHorizontal: 12,
         fontSize: 14,
         fontWeight: '500',
     },
     guestButton: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#3A3A3C',
+        borderColor: colors.border,
     },
     guestButtonText: {
-        color: '#FFFFFF',
+        color: colors.text,
         fontSize: 17,
         fontWeight: '600',
     },
     guestSubtext: {
-        color: '#8E8E93',
+        color: colors.textTertiary,
         fontSize: 13,
         marginTop: 4,
     },
