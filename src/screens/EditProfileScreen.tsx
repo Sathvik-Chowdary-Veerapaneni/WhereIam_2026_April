@@ -14,7 +14,8 @@ import {
     Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { incomeService, IncomeSource, CreateIncomeInput } from '../services/incomeService';
 import { localStorageService } from '../services';
 import { logger } from '../utils';
@@ -49,6 +50,11 @@ const getIncomeTypeInfo = (type: string) => {
 export const EditProfileScreen: React.FC = () => {
     const navigation = useNavigation();
     const { user, isGuest } = useAuth();
+    const { colors } = useTheme();
+
+    // Create dynamic styles based on theme
+    const styles = createStyles(colors);
+
     const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -455,10 +461,10 @@ export const EditProfileScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -473,28 +479,28 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     summaryCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 16,
         padding: 24,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#007AFF30',
+        borderColor: colors.primary + '30',
         marginBottom: 24,
     },
     summaryLabel: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginBottom: 8,
     },
     summaryAmount: {
         fontSize: 36,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 4,
     },
     summarySubtext: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     section: {
         marginBottom: 24,
@@ -508,28 +514,28 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     addButton: {
-        backgroundColor: '#007AFF20',
+        backgroundColor: colors.primary + '20',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#007AFF40',
+        borderColor: colors.primary + '40',
     },
     addButtonText: {
-        color: '#007AFF',
+        color: colors.primary,
         fontSize: 14,
         fontWeight: '600',
     },
     incomeCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     incomeCardHeader: {
         flexDirection: 'row',
@@ -550,47 +556,47 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: '#FF3B3020',
+        backgroundColor: colors.errorBackground,
         alignItems: 'center',
         justifyContent: 'center',
     },
     deleteButtonText: {
-        color: '#FF3B30',
+        color: colors.error,
         fontSize: 12,
         fontWeight: '600',
     },
     professionText: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     amountText: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#34C759',
+        color: colors.success,
     },
     perMonthText: {
         fontSize: 14,
         fontWeight: '400',
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     descriptionText: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginTop: 8,
         fontStyle: 'italic',
     },
     editHint: {
         fontSize: 12,
-        color: '#5E5E60',
+        color: colors.placeholder,
         marginTop: 12,
         textAlign: 'right',
     },
     // Modal Styles
     modalContainer: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     modalContent: {
         flex: 1,
@@ -601,26 +607,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#2C2C2E',
+        borderBottomColor: colors.borderLight,
     },
     modalCloseButton: {
         minWidth: 60,
     },
     modalCloseText: {
-        color: '#8E8E93',
+        color: colors.textTertiary,
         fontSize: 16,
     },
     modalTitle: {
         fontSize: 17,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     modalSaveButton: {
         minWidth: 60,
         alignItems: 'flex-end',
     },
     modalSaveText: {
-        color: '#007AFF',
+        color: colors.primary,
         fontSize: 16,
         fontWeight: '600',
     },
@@ -634,7 +640,7 @@ const styles = StyleSheet.create({
     formLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginBottom: 12,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
@@ -645,16 +651,16 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     typeButton: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         paddingVertical: 12,
         paddingHorizontal: 14,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     typeButtonText: {
         fontSize: 14,
-        color: '#FFFFFF',
+        color: colors.text,
     },
     professionGrid: {
         flexDirection: 'row',
@@ -662,55 +668,55 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     professionButton: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         paddingVertical: 12,
         paddingHorizontal: 14,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     professionSelected: {
-        backgroundColor: '#0A3D62',
-        borderColor: '#007AFF',
+        backgroundColor: colors.primary + '20',
+        borderColor: colors.primary,
     },
     professionButtonText: {
         fontSize: 14,
-        color: '#FFFFFF',
+        color: colors.text,
     },
     professionTextSelected: {
-        color: '#007AFF',
+        color: colors.primary,
         fontWeight: '600',
     },
     amountInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
         paddingHorizontal: 16,
     },
     currencySymbol: {
         fontSize: 24,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginRight: 8,
     },
     amountInput: {
         flex: 1,
         fontSize: 24,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         paddingVertical: 16,
     },
     descriptionInput: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
         padding: 16,
         fontSize: 16,
-        color: '#FFFFFF',
+        color: colors.text,
         minHeight: 80,
         textAlignVertical: 'top',
     },
