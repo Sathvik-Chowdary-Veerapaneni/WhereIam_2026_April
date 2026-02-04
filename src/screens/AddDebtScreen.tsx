@@ -17,7 +17,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { debtsService, CreateDebtInput } from '../services/debts';
 import { localStorageService } from '../services';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { logger } from '../utils';
 import { CurrencySelector, CurrencyPickerButton } from '../components';
 import { Currency, getCurrencyByCode } from '../constants/currencies';
@@ -39,8 +40,12 @@ export const AddDebtScreen: React.FC = () => {
     const navigation = useNavigation<AddDebtNavigationProp>();
     const route = useRoute<AddDebtRouteProp>();
     const { isGuest } = useAuth();
+    const { colors } = useTheme();
     const editDebtId = route.params?.debtId;
     const isEditMode = !!editDebtId;
+
+    // Create dynamic styles based on theme
+    const styles = createStyles(colors);
 
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(isEditMode);
@@ -523,10 +528,10 @@ export const AddDebtScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -555,29 +560,29 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     labelInRow: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 0,
     },
     calculatedHint: {
         fontSize: 12,
-        color: '#34C759',
+        color: colors.success,
         fontWeight: '500',
     },
     input: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         paddingVertical: 14,
         paddingHorizontal: 16,
         fontSize: 16,
-        color: '#FFFFFF',
+        color: colors.text,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     typeGrid: {
         flexDirection: 'row',
@@ -585,32 +590,32 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     typeButton: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     typeButtonSelected: {
-        backgroundColor: '#0A3D62',
-        borderColor: '#007AFF',
+        backgroundColor: colors.primary + '20',
+        borderColor: colors.primary,
     },
     typeButtonText: {
         fontSize: 14,
-        color: '#FFFFFF',
+        color: colors.text,
     },
     typeButtonTextSelected: {
-        color: '#007AFF',
+        color: colors.primary,
         fontWeight: '600',
     },
     currencyInput: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     currencySymbolButton: {
         flexDirection: 'row',
@@ -619,34 +624,34 @@ const styles = StyleSheet.create({
         paddingRight: 8,
         paddingVertical: 14,
         borderRightWidth: 1,
-        borderRightColor: '#2C2C2E',
+        borderRightColor: colors.borderLight,
     },
     currencySymbol: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#007AFF',
+        color: colors.primary,
     },
     currencyDropdown: {
         fontSize: 10,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginLeft: 4,
     },
     percentSymbol: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         paddingRight: 16,
     },
     currencyField: {
         flex: 1,
         fontSize: 18,
         fontWeight: '500',
-        color: '#FFFFFF',
+        color: colors.text,
         paddingVertical: 14,
         paddingHorizontal: 12,
     },
     submitButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -656,7 +661,7 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     submitButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: 17,
         fontWeight: '600',
     },
@@ -664,19 +669,19 @@ const styles = StyleSheet.create({
         marginTop: 8,
         paddingVertical: 8,
         paddingHorizontal: 12,
-        backgroundColor: '#007AFF20',
+        backgroundColor: colors.primary + '20',
         borderRadius: 8,
         alignSelf: 'flex-start',
     },
     useCalculatedText: {
         fontSize: 13,
-        color: '#007AFF',
+        color: colors.primary,
         fontWeight: '500',
     },
     emiInfo: {
         marginTop: 8,
         fontSize: 12,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         fontStyle: 'italic',
     },
 });
