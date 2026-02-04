@@ -16,7 +16,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { incomeService, IncomeSource } from '../services/incomeService';
 import { localStorageService } from '../services';
 import { logger } from '../utils';
@@ -55,6 +56,10 @@ const getProfessionLabel = (value: string): string => {
 export const IncomeLedgerScreen: React.FC = () => {
     const navigation = useNavigation<IncomeLedgerNavigationProp>();
     const { user, isGuest } = useAuth();
+    const { colors } = useTheme();
+
+    // Create dynamic styles based on theme
+    const styles = createStyles(colors);
 
     const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
     const [loading, setLoading] = useState(true);
@@ -361,10 +366,10 @@ export const IncomeLedgerScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -379,12 +384,12 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     summaryCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 24,
         borderWidth: 1,
-        borderColor: '#34C75940',
+        borderColor: colors.success,
     },
     summaryContent: {
         alignItems: 'center',
@@ -396,50 +401,52 @@ const styles = StyleSheet.create({
     },
     summaryLabel: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginBottom: 8,
     },
     summaryTotal: {
         fontSize: 36,
         fontWeight: '700',
-        color: '#34C759',
+        color: colors.success,
         marginBottom: 4,
     },
     summaryCount: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     ledgerHeader: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#2C2C2E',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginBottom: 8,
     },
     ledgerHeaderText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
         flex: 1,
     },
     ledgerHeaderRight: {
         textAlign: 'right',
     },
     ledgerContainer: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     ledgerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#2C2C2E',
-        backgroundColor: '#1C1C1E',
+        borderBottomColor: colors.borderLight,
+        backgroundColor: colors.card,
     },
     ledgerRowLast: {
         borderBottomWidth: 0,
@@ -450,13 +457,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     ledgerIcon: {
-        width: 36,
-        height: 36,
-        backgroundColor: '#34C75920',
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        backgroundColor: colors.successBackground,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 10,
+        marginRight: 8,
     },
     ledgerIconText: {
         fontSize: 16,
@@ -467,12 +474,12 @@ const styles = StyleSheet.create({
     ledgerIncomeName: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 2,
     },
     ledgerIncomeDescription: {
         fontSize: 12,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     ledgerType: {
         flex: 0.8,
@@ -480,7 +487,7 @@ const styles = StyleSheet.create({
     },
     ledgerTypeValue: {
         fontSize: 11,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
     },
     ledgerAmount: {
@@ -490,11 +497,11 @@ const styles = StyleSheet.create({
     ledgerAmountValue: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#34C759',
+        color: colors.success,
     },
     ledgerPerMonth: {
         fontSize: 11,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginTop: 2,
     },
     ledgerFooter: {
@@ -502,27 +509,27 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 16,
-        backgroundColor: '#252528',
+        backgroundColor: colors.cardSecondary,
         borderTopWidth: 1,
-        borderTopColor: '#3A3A3C',
+        borderTopColor: colors.handle,
     },
     ledgerFooterLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     ledgerFooterValue: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#34C759',
+        color: colors.success,
     },
     emptyState: {
         alignItems: 'center',
         paddingVertical: 60,
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     emptyIcon: {
         fontSize: 48,
@@ -531,32 +538,32 @@ const styles = StyleSheet.create({
     emptyTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     emptySubtitle: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
         paddingHorizontal: 40,
         marginBottom: 20,
     },
     emptyButton: {
-        backgroundColor: '#34C75920',
+        backgroundColor: colors.successBackground,
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#34C75940',
+        borderColor: colors.success,
     },
     emptyButtonText: {
-        color: '#34C759',
+        color: colors.success,
         fontSize: 14,
         fontWeight: '600',
     },
     footerNote: {
         fontSize: 12,
-        color: '#636366',
+        color: colors.placeholder,
         textAlign: 'center',
         marginTop: 16,
     },
@@ -564,7 +571,7 @@ const styles = StyleSheet.create({
     deleteAction: {
         height: '100%',
         width: 96,
-        backgroundColor: '#FF3B30',
+        backgroundColor: colors.error,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -576,7 +583,7 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     deleteButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: 15,
         fontWeight: '600',
     },
