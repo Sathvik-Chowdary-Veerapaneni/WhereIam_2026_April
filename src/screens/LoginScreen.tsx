@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { authService } from '../services';
+import { useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { logger } from '../utils';
 
 export const LoginScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,7 +22,7 @@ export const LoginScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const { success, user, error } = isSignUp 
+      const { success, user, error } = isSignUp
         ? await authService.signUp(email, password)
         : await authService.signIn(email, password);
 
@@ -66,8 +71,8 @@ export const LoginScreen: React.FC = () => {
 
           {loading && <ActivityIndicator size="large" color="#0066CC" style={styles.loader} />}
 
-          <TouchableOpacity 
-            style={[styles.button, styles.buttonPrimary]} 
+          <TouchableOpacity
+            style={[styles.button, styles.buttonPrimary]}
             onPress={handleAuth}
             disabled={loading}
           >
@@ -76,7 +81,7 @@ export const LoginScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.toggleButton}
             onPress={() => {
               setIsSignUp(!isSignUp);
@@ -95,10 +100,10 @@ export const LoginScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
@@ -110,11 +115,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
     textAlign: 'center',
-    color: '#000',
+    color: colors.text,
   },
   subtitle: {
     fontSize: 18,
-    color: '#666',
+    color: colors.textTertiary,
     marginBottom: 32,
     textAlign: 'center',
   },
@@ -123,12 +128,13 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
+    backgroundColor: colors.card,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#000',
+    color: colors.text,
   },
   loader: {
     marginVertical: 8,
@@ -141,10 +147,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   buttonPrimary: {
-    backgroundColor: '#0066CC',
+    backgroundColor: colors.primary,
   },
   buttonText: {
-    color: '#fff',
+    color: colors.textInverse,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -152,7 +158,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   toggleText: {
-    color: '#0066CC',
+    color: colors.primary,
     fontSize: 14,
     textAlign: 'center',
     fontWeight: '500',
