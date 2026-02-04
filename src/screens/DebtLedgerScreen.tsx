@@ -23,7 +23,8 @@ import { RootStackParamList } from '../navigation/types';
 import { debtsService, Debt } from '../services/debts';
 import { debtTransactionsService, DebtTransaction } from '../services/debtTransactions';
 import { localStorageService } from '../services';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { logger } from '../utils';
 import { formatCurrencyAmount, getCurrencyByCode } from '../constants/currencies';
 
@@ -60,7 +61,11 @@ export const DebtLedgerScreen: React.FC = () => {
     const navigation = useNavigation<DebtLedgerNavigationProp>();
     const route = useRoute<DebtLedgerRouteProp>();
     const { isGuest } = useAuth();
+    const { colors } = useTheme();
     const filterCurrency = route.params?.currencyCode;
+
+    // Create dynamic styles based on theme
+    const styles = createStyles(colors);
 
     const [debts, setDebts] = useState<Debt[]>([]);
     const [loading, setLoading] = useState(true);
@@ -497,9 +502,9 @@ export const DebtLedgerScreen: React.FC = () => {
 
                     {/* Ledger Header */}
                     <View style={styles.ledgerHeader}>
-                        <Text style={styles.ledgerHeaderText}>Debt</Text>
-                        <Text style={styles.ledgerHeaderText}>APR</Text>
-                        <Text style={[styles.ledgerHeaderText, styles.ledgerHeaderRight]}>Balance</Text>
+                        <Text style={[styles.ledgerHeaderText, styles.ledgerHeaderDebt]}>Debt</Text>
+                        <Text style={[styles.ledgerHeaderText, styles.ledgerHeaderApr]}>APR</Text>
+                        <Text style={[styles.ledgerHeaderText, styles.ledgerHeaderBalance]}>Balance</Text>
                     </View>
 
                     {/* Ledger Entries */}
@@ -818,10 +823,10 @@ export const DebtLedgerScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -836,12 +841,12 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     summaryCard: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 24,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     summaryRow: {
         flexDirection: 'row',
@@ -854,20 +859,20 @@ const styles = StyleSheet.create({
     summaryDivider: {
         width: 1,
         height: 40,
-        backgroundColor: '#3A3A3C',
+        backgroundColor: colors.handle,
     },
     summaryLabel: {
         fontSize: 12,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginBottom: 4,
     },
     summaryValue: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     summaryValueRed: {
-        color: '#FF3B30',
+        color: colors.error,
     },
     filteredSummary: {
         alignItems: 'center',
@@ -885,64 +890,73 @@ const styles = StyleSheet.create({
     filteredCurrencyCode: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     filteredTotal: {
         fontSize: 32,
         fontWeight: '700',
-        color: '#FF3B30',
+        color: colors.error,
         marginBottom: 4,
     },
     filteredCount: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     ledgerHeader: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#2C2C2E',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginBottom: 8,
     },
     ledgerHeaderText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textTransform: 'uppercase',
-        flex: 1,
+        letterSpacing: 0.5,
     },
-    ledgerHeaderRight: {
+    ledgerHeaderDebt: {
+        flex: 2.2,
+    },
+    ledgerHeaderApr: {
+        flex: 0.6,
+        textAlign: 'center',
+    },
+    ledgerHeaderBalance: {
+        flex: 1.2,
         textAlign: 'right',
     },
     ledgerContainer: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     ledgerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 14,
-        backgroundColor: '#1C1C1E',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        backgroundColor: colors.card,
     },
     ledgerRowExpanded: {
-        backgroundColor: '#252528',
+        backgroundColor: colors.cardSecondary,
     },
     ledgerDebtInfo: {
-        flex: 2,
+        flex: 2.2,
         flexDirection: 'row',
         alignItems: 'center',
     },
     ledgerIcon: {
-        width: 36,
-        height: 36,
-        backgroundColor: '#2C2C2E',
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        backgroundColor: colors.borderLight,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 10,
+        marginRight: 8,
     },
     ledgerIconText: {
         fontSize: 16,
@@ -953,65 +967,65 @@ const styles = StyleSheet.create({
     ledgerDebtName: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 2,
     },
     ledgerDebtType: {
         fontSize: 12,
-        color: '#8E8E93',
+        color: colors.textTertiary,
     },
     ledgerApr: {
-        flex: 0.7,
+        flex: 0.6,
         alignItems: 'center',
     },
     ledgerAprValue: {
-        fontSize: 13,
-        color: '#8E8E93',
+        fontSize: 12,
+        color: colors.textTertiary,
     },
     ledgerBalance: {
-        flex: 1,
+        flex: 1.2,
         alignItems: 'flex-end',
     },
     ledgerBalanceValue: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#FF3B30',
+        color: colors.error,
     },
     expandIndicator: {
         fontSize: 10,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginTop: 2,
     },
     debtDivider: {
         height: 1,
-        backgroundColor: '#2C2C2E',
+        backgroundColor: colors.borderLight,
     },
     ledgerFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 16,
-        backgroundColor: '#252528',
+        backgroundColor: colors.cardSecondary,
         borderTopWidth: 1,
-        borderTopColor: '#3A3A3C',
+        borderTopColor: colors.handle,
     },
     ledgerFooterLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     ledgerFooterValue: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#FF3B30',
+        color: colors.error,
     },
     emptyState: {
         alignItems: 'center',
         paddingVertical: 60,
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     emptyIcon: {
         fontSize: 48,
@@ -1020,18 +1034,18 @@ const styles = StyleSheet.create({
     emptyTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     emptySubtitle: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
         paddingHorizontal: 40,
     },
     footerNote: {
         fontSize: 12,
-        color: '#636366',
+        color: colors.placeholder,
         textAlign: 'center',
         marginTop: 16,
     },
@@ -1042,27 +1056,27 @@ const styles = StyleSheet.create({
     },
     editAction: {
         width: 80,
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
     },
     deleteAction: {
         width: 80,
-        backgroundColor: '#FF3B30',
+        backgroundColor: colors.error,
         justifyContent: 'center',
         alignItems: 'center',
     },
     actionButtonText: {
-        color: '#FFFFFF',
+        color: colors.textInverse,
         fontSize: 15,
         fontWeight: '600',
     },
     // Transaction history styles
     transactionContainer: {
-        backgroundColor: '#1A1A1D',
+        backgroundColor: colors.backgroundSecondary,
         padding: 12,
         borderTopWidth: 1,
-        borderTopColor: '#2C2C2E',
+        borderTopColor: colors.borderLight,
     },
     transactionActions: {
         flexDirection: 'row',
@@ -1071,36 +1085,36 @@ const styles = StyleSheet.create({
     },
     paymentButton: {
         flex: 1,
-        backgroundColor: '#34C75920',
+        backgroundColor: colors.successBackground,
         paddingVertical: 10,
         borderRadius: 8,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#34C75940',
+        borderColor: colors.success,
     },
     paymentButtonText: {
-        color: '#34C759',
+        color: colors.success,
         fontSize: 14,
         fontWeight: '600',
     },
     borrowButton: {
         flex: 1,
-        backgroundColor: '#FF3B3020',
+        backgroundColor: colors.errorBackground,
         paddingVertical: 10,
         borderRadius: 8,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#FF3B3040',
+        borderColor: colors.error,
     },
     borrowButtonText: {
-        color: '#FF3B30',
+        color: colors.error,
         fontSize: 14,
         fontWeight: '600',
     },
     transactionTitle: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textTransform: 'uppercase',
         marginBottom: 8,
     },
@@ -1113,7 +1127,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#2C2C2E',
+        borderBottomColor: colors.borderLight,
     },
     transactionRight: {
         alignItems: 'flex-end',
@@ -1131,16 +1145,16 @@ const styles = StyleSheet.create({
     },
     transactionDate: {
         fontSize: 13,
-        color: '#FFFFFF',
+        color: colors.text,
     },
     transactionNotes: {
         fontSize: 12,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginTop: 2,
     },
     transactionInterest: {
         fontSize: 11,
-        color: '#FF3B30',
+        color: colors.error,
         marginTop: 2,
     },
     transactionAmount: {
@@ -1149,29 +1163,29 @@ const styles = StyleSheet.create({
     },
     transactionRunningBalance: {
         fontSize: 11,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginTop: 4,
         textAlign: 'right',
     },
     transactionPayment: {
-        color: '#34C759',
+        color: colors.success,
     },
     transactionBorrow: {
-        color: '#FF3B30',
+        color: colors.error,
     },
     transactionInitial: {
-        color: '#FFFFFF', // White for initial balance
+        color: colors.text, // White for initial balance
     },
     noTransactions: {
         fontSize: 13,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         textAlign: 'center',
         paddingVertical: 16,
     },
     // Modal styles
     modalContainer: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     modalContent: {
         flex: 1,
@@ -1182,26 +1196,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#2C2C2E',
+        borderBottomColor: colors.borderLight,
     },
     modalCloseButton: {
         minWidth: 60,
     },
     modalCloseText: {
-        color: '#8E8E93',
+        color: colors.textTertiary,
         fontSize: 16,
     },
     modalTitle: {
         fontSize: 17,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
     },
     modalSaveButton: {
         minWidth: 60,
         alignItems: 'flex-end',
     },
     modalSaveText: {
-        color: '#007AFF',
+        color: colors.primary,
         fontSize: 16,
         fontWeight: '600',
     },
@@ -1210,26 +1224,26 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     modalDebtInfo: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         padding: 16,
         marginBottom: 24,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     modalDebtName: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 4,
     },
     modalDebtBalance: {
         fontSize: 14,
-        color: '#FF3B30',
+        color: colors.error,
     },
     modalInterestNote: {
         fontSize: 12,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginTop: 4,
     },
     formSection: {
@@ -1238,7 +1252,7 @@ const styles = StyleSheet.create({
     formLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginBottom: 12,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
@@ -1249,24 +1263,24 @@ const styles = StyleSheet.create({
     },
     typeButton: {
         flex: 1,
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         paddingVertical: 14,
         borderRadius: 10,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     typeButtonPayment: {
-        backgroundColor: '#34C75920',
-        borderColor: '#34C759',
+        backgroundColor: colors.successBackground,
+        borderColor: colors.success,
     },
     typeButtonBorrow: {
-        backgroundColor: '#FF3B3020',
-        borderColor: '#FF3B30',
+        backgroundColor: colors.errorBackground,
+        borderColor: colors.error,
     },
     typeButtonText: {
         fontSize: 14,
-        color: '#FFFFFF',
+        color: colors.text,
     },
     typeButtonTextActive: {
         fontWeight: '600',
@@ -1274,33 +1288,33 @@ const styles = StyleSheet.create({
     amountInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
         paddingHorizontal: 16,
     },
     currencySymbol: {
         fontSize: 24,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginRight: 8,
     },
     amountInput: {
         flex: 1,
         fontSize: 24,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         paddingVertical: 16,
     },
     notesInput: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
         padding: 16,
         fontSize: 16,
-        color: '#FFFFFF',
+        color: colors.text,
         minHeight: 80,
         textAlignVertical: 'top',
     },
