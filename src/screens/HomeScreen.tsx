@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { authService } from '../services';
+import { useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { logger } from '../utils';
 
 export const HomeScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
@@ -55,7 +60,7 @@ export const HomeScreen: React.FC = () => {
         </View>
 
         <View style={styles.section}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.button, styles.buttonSecondary]}
             onPress={handleLogout}
             disabled={loading}
@@ -70,10 +75,10 @@ export const HomeScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   content: {
     padding: 20,
@@ -83,11 +88,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 4,
-    color: '#000',
+    color: colors.text,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textTertiary,
     marginBottom: 24,
   },
   section: {
@@ -97,35 +102,37 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
-    color: '#000',
+    color: colors.text,
   },
   card: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   cardLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textTertiary,
     marginBottom: 4,
   },
   cardValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#0066CC',
+    color: colors.primary,
   },
   actionButton: {
-    backgroundColor: '#e8f0ff',
+    backgroundColor: colors.primary + '20',
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#0066CC',
+    borderLeftColor: colors.primary,
   },
   actionButtonText: {
-    color: '#0066CC',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -136,13 +143,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonSecondary: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.borderLight,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
 });
