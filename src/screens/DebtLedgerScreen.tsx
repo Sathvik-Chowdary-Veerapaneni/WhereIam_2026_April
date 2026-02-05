@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import * as Haptics from 'expo-haptics';
 import {
     View,
     Text,
@@ -295,6 +296,8 @@ export const DebtLedgerScreen: React.FC = () => {
                     text: 'Delete',
                     style: 'destructive',
                     onPress: async () => {
+                        // Trigger medium haptic feedback for delete confirmation
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         closeSwipeable(debt.id);
 
                         const previousDebts = debts;
