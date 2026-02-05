@@ -109,3 +109,8 @@ migrations/
 
 # Claude Code
 CLAUDE.md
+
+# Test files with sensitive data
+src/screens/TestScreen.tsx
+**/TestScreen.tsx
+*.test.credentials.*
