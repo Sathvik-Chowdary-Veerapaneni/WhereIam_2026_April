@@ -13,7 +13,8 @@ import {
     Platform,
 } from 'react-native';
 import { supabase, localStorageService } from '../services';
-import { useAuth } from '../context';
+import { useAuth, useTheme } from '../context';
+import type { ThemeColors } from '../context';
 import { logger } from '../utils';
 
 const PROFESSIONS = [
@@ -29,6 +30,8 @@ const PROFESSIONS = [
 
 export const OnboardingScreen: React.FC = () => {
     const { user, isGuest, guestDaysRemaining, checkOnboardingStatus } = useAuth();
+    const { colors } = useTheme();
+    const styles = createStyles(colors);
     const [profession, setProfession] = useState<string | null>(null);
     const [monthlyIncome, setMonthlyIncome] = useState('');
     const [loading, setLoading] = useState(false);
@@ -164,7 +167,7 @@ export const OnboardingScreen: React.FC = () => {
                             <TextInput
                                 style={styles.incomeInput}
                                 placeholder="0.00"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={colors.placeholder}
                                 keyboardType="decimal-pad"
                                 value={monthlyIncome}
                                 onChangeText={(text) => setMonthlyIncome(formatCurrency(text))}
@@ -190,10 +193,10 @@ export const OnboardingScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A0A0F',
+        backgroundColor: colors.background,
     },
     keyboardView: {
         flex: 1,
@@ -206,7 +209,7 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     guestBanner: {
-        backgroundColor: '#FF9500',
+        backgroundColor: colors.warning,
         borderRadius: 12,
         padding: 16,
         marginBottom: 24,
@@ -228,12 +231,12 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         lineHeight: 22,
     },
     section: {
@@ -242,12 +245,12 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         marginBottom: 8,
     },
     sectionHint: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginBottom: 16,
     },
     professionGrid: {
@@ -257,49 +260,49 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     professionButton: {
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
     },
     professionSelected: {
-        backgroundColor: '#0A3D62',
-        borderColor: '#007AFF',
+        backgroundColor: colors.primaryLight + '20',
+        borderColor: colors.primary,
     },
     professionText: {
         fontSize: 15,
-        color: '#FFFFFF',
+        color: colors.text,
     },
     professionTextSelected: {
-        color: '#007AFF',
+        color: colors.primary,
         fontWeight: '600',
     },
     incomeInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1C1C1E',
+        backgroundColor: colors.card,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        borderColor: colors.borderLight,
         paddingHorizontal: 16,
     },
     currencySymbol: {
         fontSize: 24,
         fontWeight: '600',
-        color: '#8E8E93',
+        color: colors.textTertiary,
         marginRight: 8,
     },
     incomeInput: {
         flex: 1,
         fontSize: 24,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: colors.text,
         paddingVertical: 16,
     },
     submitButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.primary,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -314,3 +317,4 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+
