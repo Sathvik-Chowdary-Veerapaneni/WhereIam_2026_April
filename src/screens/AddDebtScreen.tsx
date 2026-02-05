@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as Haptics from 'expo-haptics';
 import {
     View,
     Text,
@@ -300,6 +301,8 @@ export const AddDebtScreen: React.FC = () => {
                         priority: 0,
                     });
                     logger.info('Local debt added successfully');
+                    // Trigger light haptic feedback for successful add
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 }
             } else {
                 // Use Supabase for authenticated users
@@ -326,6 +329,8 @@ export const AddDebtScreen: React.FC = () => {
                         throw error || new Error('Failed to create debt');
                     }
                     logger.info('Debt added successfully');
+                    // Trigger light haptic feedback for successful add
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 }
             }
 
