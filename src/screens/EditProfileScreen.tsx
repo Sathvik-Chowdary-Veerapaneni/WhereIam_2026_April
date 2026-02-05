@@ -12,6 +12,7 @@ import {
     Modal,
     KeyboardAvoidingView,
     Platform,
+    FlatList,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth, useTheme } from '../context';
@@ -66,6 +67,8 @@ export const EditProfileScreen: React.FC = () => {
     const [formAmount, setFormAmount] = useState<string>('');
     const [formType, setFormType] = useState<string>('primary');
     const [formDescription, setFormDescription] = useState<string>('');
+    const [showProfessionPicker, setShowProfessionPicker] = useState(false);
+    const [showIncomeTypePicker, setShowIncomeTypePicker] = useState(false);
 
     const loadIncomeSources = useCallback(async () => {
         try {
@@ -372,56 +375,34 @@ export const EditProfileScreen: React.FC = () => {
                             {/* Income Type Selection */}
                             <View style={styles.formSection}>
                                 <Text style={styles.formLabel}>Income Type</Text>
-                                <View style={styles.typeGrid}>
-                                    {INCOME_TYPES.map((type) => (
-                                        <TouchableOpacity
-                                            key={type.id}
-                                            style={[
-                                                styles.typeButton,
-                                                formType === type.value && {
-                                                    backgroundColor: type.color + '20',
-                                                    borderColor: type.color,
-                                                },
-                                            ]}
-                                            onPress={() => setFormType(type.value)}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.typeButtonText,
-                                                    formType === type.value && { color: type.color },
-                                                ]}
-                                            >
-                                                {type.label}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                <TouchableOpacity
+                                    style={styles.dropdownButton}
+                                    onPress={() => setShowIncomeTypePicker(true)}
+                                >
+                                    <View style={styles.dropdownContent}>
+                                        <View style={[styles.colorDot, { backgroundColor: getIncomeTypeInfo(formType).color }]} />
+                                        <Text style={styles.dropdownButtonText}>
+                                            {getIncomeTypeInfo(formType).label}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.dropdownIcon}>▼</Text>
+                                </TouchableOpacity>
                             </View>
 
                             {/* Profession Selection */}
                             <View style={styles.formSection}>
                                 <Text style={styles.formLabel}>Profession</Text>
-                                <View style={styles.professionGrid}>
-                                    {PROFESSIONS.map((item) => (
-                                        <TouchableOpacity
-                                            key={item.id}
-                                            style={[
-                                                styles.professionButton,
-                                                formProfession === item.value && styles.professionSelected,
-                                            ]}
-                                            onPress={() => setFormProfession(item.value)}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.professionButtonText,
-                                                    formProfession === item.value && styles.professionTextSelected,
-                                                ]}
-                                            >
-                                                {item.label}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                <TouchableOpacity
+                                    style={styles.dropdownButton}
+                                    onPress={() => setShowProfessionPicker(true)}
+                                >
+                                    <Text style={formProfession ? styles.dropdownButtonText : styles.dropdownPlaceholder}>
+                                        {formProfession
+                                            ? getProfessionLabel(formProfession)
+                                            : 'Select profession...'}
+                                    </Text>
+                                    <Text style={styles.dropdownIcon}>▼</Text>
+                                </TouchableOpacity>
                             </View>
 
                             {/* Monthly Amount */}
@@ -456,6 +437,103 @@ export const EditProfileScreen: React.FC = () => {
                         </ScrollView>
                     </SafeAreaView>
                 </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Profession Picker Modal */}
+            <Modal
+                visible={showProfessionPicker}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowProfessionPicker(false)}
+            >
+                <SafeAreaView style={styles.pickerModalContainer}>
+                    <View style={styles.pickerModalHeader}>
+                        <TouchableOpacity
+                            onPress={() => setShowProfessionPicker(false)}
+                            style={styles.pickerModalCloseButton}
+                        >
+                            <Text style={styles.pickerModalCloseText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.pickerModalTitle}>Select Profession</Text>
+                        <View style={styles.pickerModalCloseButton} />
+                    </View>
+                    <FlatList
+                        data={PROFESSIONS}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.pickerList}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={[
+                                    styles.pickerOption,
+                                    formProfession === item.value && styles.pickerOptionSelected,
+                                ]}
+                                onPress={() => {
+                                    setFormProfession(item.value);
+                                    setShowProfessionPicker(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.pickerOptionText,
+                                    formProfession === item.value && styles.pickerOptionTextSelected,
+                                ]}>
+                                    {item.label}
+                                </Text>
+                                {formProfession === item.value && (
+                                    <Text style={styles.pickerCheckmark}>✓</Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                    />
+                </SafeAreaView>
+            </Modal>
+
+            {/* Income Type Picker Modal */}
+            <Modal
+                visible={showIncomeTypePicker}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowIncomeTypePicker(false)}
+            >
+                <SafeAreaView style={styles.pickerModalContainer}>
+                    <View style={styles.pickerModalHeader}>
+                        <TouchableOpacity
+                            onPress={() => setShowIncomeTypePicker(false)}
+                            style={styles.pickerModalCloseButton}
+                        >
+                            <Text style={styles.pickerModalCloseText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.pickerModalTitle}>Select Income Type</Text>
+                        <View style={styles.pickerModalCloseButton} />
+                    </View>
+                    <FlatList
+                        data={INCOME_TYPES}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.pickerList}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={[
+                                    styles.pickerOption,
+                                    formType === item.value && styles.pickerOptionSelected,
+                                    { borderLeftWidth: 4, borderLeftColor: item.color },
+                                ]}
+                                onPress={() => {
+                                    setFormType(item.value);
+                                    setShowIncomeTypePicker(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.pickerOptionText,
+                                    formType === item.value && styles.pickerOptionTextSelected,
+                                ]}>
+                                    {item.label}
+                                </Text>
+                                {formType === item.value && (
+                                    <Text style={styles.pickerCheckmark}>✓</Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                    />
+                </SafeAreaView>
             </Modal>
         </SafeAreaView>
     );
@@ -645,45 +723,95 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
-    typeGrid: {
+    // Dropdown button styles
+    dropdownButton: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-    },
-    typeButton: {
+        justifyContent: 'space-between',
+        alignItems: 'center',
         backgroundColor: colors.card,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        borderRadius: 10,
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
         borderWidth: 1,
         borderColor: colors.borderLight,
     },
-    typeButtonText: {
-        fontSize: 14,
+    dropdownContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    colorDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        marginRight: 10,
+    },
+    dropdownButtonText: {
+        fontSize: 16,
         color: colors.text,
     },
-    professionGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
+    dropdownPlaceholder: {
+        fontSize: 16,
+        color: colors.placeholder,
     },
-    professionButton: {
-        backgroundColor: colors.card,
+    dropdownIcon: {
+        fontSize: 12,
+        color: colors.textTertiary,
+    },
+    // Picker Modal styles
+    pickerModalContainer: {
+        flex: 1,
+        backgroundColor: colors.background,
+    },
+    pickerModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
         paddingVertical: 12,
-        paddingHorizontal: 14,
-        borderRadius: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderLight,
+    },
+    pickerModalCloseButton: {
+        width: 60,
+    },
+    pickerModalCloseText: {
+        fontSize: 16,
+        color: colors.primary,
+    },
+    pickerModalTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    pickerList: {
+        padding: 16,
+    },
+    pickerOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: colors.card,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginBottom: 8,
         borderWidth: 1,
         borderColor: colors.borderLight,
     },
-    professionSelected: {
-        backgroundColor: colors.primary + '20',
+    pickerOptionSelected: {
+        backgroundColor: colors.primary + '15',
         borderColor: colors.primary,
     },
-    professionButtonText: {
-        fontSize: 14,
+    pickerOptionText: {
+        fontSize: 16,
         color: colors.text,
     },
-    professionTextSelected: {
+    pickerOptionTextSelected: {
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    pickerCheckmark: {
+        fontSize: 18,
         color: colors.primary,
         fontWeight: '600',
     },
