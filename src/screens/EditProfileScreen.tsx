@@ -280,15 +280,7 @@ export const EditProfileScreen: React.FC = () => {
 
                 {/* Income Sources List */}
                 <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Income Sources</Text>
-                        <TouchableOpacity
-                            style={styles.addButton}
-                            onPress={openAddModal}
-                        >
-                            <Text style={styles.addButtonText}>+ Add</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <Text style={styles.sectionTitle}>Income Sources</Text>
 
                     {incomeSources.map((source) => {
                         const typeInfo = getIncomeTypeInfo(source.income_type);
@@ -333,6 +325,15 @@ export const EditProfileScreen: React.FC = () => {
                             </TouchableOpacity>
                         );
                     })}
+
+                    {/* Add Additional Income Button */}
+                    <TouchableOpacity
+                        style={styles.addIncomeButton}
+                        onPress={openAddModal}
+                    >
+                        <Text style={styles.addIncomeButtonIcon}>+</Text>
+                        <Text style={styles.addIncomeButtonText}>Add Additional Income</Text>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
 
@@ -443,7 +444,7 @@ export const EditProfileScreen: React.FC = () => {
             <Modal
                 visible={showProfessionPicker}
                 animationType="slide"
-                presentationStyle="pageSheet"
+                transparent={false}
                 onRequestClose={() => setShowProfessionPicker(false)}
             >
                 <SafeAreaView style={styles.pickerModalContainer}>
@@ -491,7 +492,7 @@ export const EditProfileScreen: React.FC = () => {
             <Modal
                 visible={showIncomeTypePicker}
                 animationType="slide"
-                presentationStyle="pageSheet"
+                transparent={false}
                 onRequestClose={() => setShowIncomeTypePicker(false)}
             >
                 <SafeAreaView style={styles.pickerModalContainer}>
@@ -593,6 +594,28 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: colors.text,
+        marginBottom: 16,
+    },
+    addIncomeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        marginTop: 8,
+    },
+    addIncomeButtonIcon: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        marginRight: 8,
+    },
+    addIncomeButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
     addButton: {
         backgroundColor: colors.primary + '20',
