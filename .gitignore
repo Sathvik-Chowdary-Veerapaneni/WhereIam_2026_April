@@ -38,6 +38,10 @@ yarn.lock.bak
 .env.local
 .env.*.local
 .env.production.local
+.env.development
+.env.staging
+*.local.json
+local.config.*
 
 # IDE & Editor
 .vscode/
