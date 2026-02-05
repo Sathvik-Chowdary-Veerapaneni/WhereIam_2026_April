@@ -11,6 +11,8 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
+    Modal,
+    FlatList,
 } from 'react-native';
 import { supabase, localStorageService } from '../services';
 import { useAuth, useTheme } from '../context';
@@ -33,6 +35,7 @@ export const OnboardingScreen: React.FC = () => {
     const { colors } = useTheme();
     const styles = createStyles(colors);
     const [profession, setProfession] = useState<string | null>(null);
+    const [showProfessionSelector, setShowProfessionSelector] = useState(false);
     const [monthlyIncome, setMonthlyIncome] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -135,28 +138,18 @@ export const OnboardingScreen: React.FC = () => {
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>What's your profession?</Text>
-                        <View style={styles.professionGrid}>
-                            {PROFESSIONS.map((item) => (
-                                <TouchableOpacity
-                                    key={item.id}
-                                    style={[
-                                        styles.professionButton,
-                                        profession === item.value && styles.professionSelected,
-                                    ]}
-                                    onPress={() => setProfession(item.value)}
-                                    disabled={loading}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.professionText,
-                                            profession === item.value && styles.professionTextSelected,
-                                        ]}
-                                    >
-                                        {item.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                        <TouchableOpacity
+                            style={styles.dropdownButton}
+                            onPress={() => setShowProfessionSelector(true)}
+                            disabled={loading}
+                        >
+                            <Text style={profession ? styles.dropdownButtonText : styles.dropdownPlaceholder}>
+                                {profession
+                                    ? PROFESSIONS.find(p => p.value === profession)?.label
+                                    : 'Select your profession...'}
+                            </Text>
+                            <Text style={styles.dropdownIcon}>▼</Text>
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.section}>
@@ -189,6 +182,54 @@ export const OnboardingScreen: React.FC = () => {
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Profession Selector Modal */}
+            <Modal
+                visible={showProfessionSelector}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowProfessionSelector(false)}
+            >
+                <SafeAreaView style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity
+                            onPress={() => setShowProfessionSelector(false)}
+                            style={styles.modalCloseButton}
+                        >
+                            <Text style={styles.modalCloseText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Select Profession</Text>
+                        <View style={styles.modalCloseButton} />
+                    </View>
+                    <FlatList
+                        data={PROFESSIONS}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.professionList}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={[
+                                    styles.professionOption,
+                                    profession === item.value && styles.professionOptionSelected,
+                                ]}
+                                onPress={() => {
+                                    setProfession(item.value);
+                                    setShowProfessionSelector(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.professionOptionText,
+                                    profession === item.value && styles.professionOptionTextSelected,
+                                ]}>
+                                    {item.label}
+                                </Text>
+                                {profession === item.value && (
+                                    <Text style={styles.checkmark}>✓</Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                    />
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -251,31 +292,87 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     sectionHint: {
         fontSize: 14,
         color: colors.textTertiary,
-        marginBottom: 16,
     },
-    professionGrid: {
+    // Dropdown button styles
+    dropdownButton: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: colors.card,
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: colors.borderLight,
         marginTop: 8,
     },
-    professionButton: {
-        backgroundColor: colors.card,
+    dropdownButtonText: {
+        fontSize: 16,
+        color: colors.text,
+    },
+    dropdownPlaceholder: {
+        fontSize: 16,
+        color: colors.placeholder,
+    },
+    dropdownIcon: {
+        fontSize: 12,
+        color: colors.textTertiary,
+    },
+    // Modal styles
+    modalContainer: {
+        flex: 1,
+        backgroundColor: colors.background,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
         paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderLight,
+    },
+    modalCloseButton: {
+        width: 60,
+    },
+    modalCloseText: {
+        fontSize: 16,
+        color: colors.primary,
+    },
+    modalTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    professionList: {
+        padding: 16,
+    },
+    professionOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: colors.card,
+        paddingVertical: 16,
         paddingHorizontal: 16,
         borderRadius: 12,
+        marginBottom: 8,
         borderWidth: 1,
         borderColor: colors.borderLight,
     },
-    professionSelected: {
-        backgroundColor: colors.primaryLight + '20',
+    professionOptionSelected: {
+        backgroundColor: colors.primary + '15',
         borderColor: colors.primary,
     },
-    professionText: {
-        fontSize: 15,
+    professionOptionText: {
+        fontSize: 16,
         color: colors.text,
     },
-    professionTextSelected: {
+    professionOptionTextSelected: {
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    checkmark: {
+        fontSize: 18,
         color: colors.primary,
         fontWeight: '600',
     },
