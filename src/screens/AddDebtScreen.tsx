@@ -12,6 +12,8 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    Modal,
+    FlatList,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -51,6 +53,7 @@ export const AddDebtScreen: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(isEditMode);
     const [showCurrencySelector, setShowCurrencySelector] = useState(false);
+    const [showDebtTypeSelector, setShowDebtTypeSelector] = useState(false);
     const [selectedCurrencyCode, setSelectedCurrencyCode] = useState('USD');
 
     // Form state - store raw numeric values as strings
@@ -381,28 +384,18 @@ export const AddDebtScreen: React.FC = () => {
                     {/* Debt Type */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Debt Type *</Text>
-                        <View style={styles.typeGrid}>
-                            {DEBT_TYPES.map((type) => (
-                                <TouchableOpacity
-                                    key={type.id}
-                                    style={[
-                                        styles.typeButton,
-                                        debtType === type.id && styles.typeButtonSelected,
-                                    ]}
-                                    onPress={() => setDebtType(type.id)}
-                                    disabled={loading}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.typeButtonText,
-                                            debtType === type.id && styles.typeButtonTextSelected,
-                                        ]}
-                                    >
-                                        {type.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                        <TouchableOpacity
+                            style={styles.dropdownButton}
+                            onPress={() => setShowDebtTypeSelector(true)}
+                            disabled={loading}
+                        >
+                            <Text style={debtType ? styles.dropdownButtonText : styles.dropdownPlaceholder}>
+                                {debtType
+                                    ? DEBT_TYPES.find(t => t.id === debtType)?.label
+                                    : 'Select debt type...'}
+                            </Text>
+                            <Text style={styles.dropdownIcon}>▼</Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Creditor Name */}
@@ -529,6 +522,54 @@ export const AddDebtScreen: React.FC = () => {
                 onSelect={handleCurrencySelect}
                 selectedCurrencyCode={selectedCurrencyCode}
             />
+
+            {/* Debt Type Selector Modal */}
+            <Modal
+                visible={showDebtTypeSelector}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setShowDebtTypeSelector(false)}
+            >
+                <SafeAreaView style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity
+                            onPress={() => setShowDebtTypeSelector(false)}
+                            style={styles.modalCloseButton}
+                        >
+                            <Text style={styles.modalCloseText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Select Debt Type</Text>
+                        <View style={styles.modalCloseButton} />
+                    </View>
+                    <FlatList
+                        data={DEBT_TYPES}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.debtTypeList}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={[
+                                    styles.debtTypeOption,
+                                    debtType === item.id && styles.debtTypeOptionSelected,
+                                ]}
+                                onPress={() => {
+                                    setDebtType(item.id);
+                                    setShowDebtTypeSelector(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.debtTypeOptionText,
+                                    debtType === item.id && styles.debtTypeOptionTextSelected,
+                                ]}>
+                                    {item.label}
+                                </Text>
+                                {debtType === item.id && (
+                                    <Text style={styles.checkmark}>✓</Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                    />
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -587,30 +628,86 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 16,
         color: colors.text,
         borderWidth: 1,
-        borderColor: colors.borderLight,
     },
-    typeGrid: {
+    // Dropdown button styles
+    dropdownButton: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-    },
-    typeButton: {
+        justifyContent: 'space-between',
+        alignItems: 'center',
         backgroundColor: colors.card,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        borderRadius: 10,
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
         borderWidth: 1,
         borderColor: colors.borderLight,
     },
-    typeButtonSelected: {
-        backgroundColor: colors.primary + '20',
-        borderColor: colors.primary,
-    },
-    typeButtonText: {
-        fontSize: 14,
+    dropdownButtonText: {
+        fontSize: 16,
         color: colors.text,
     },
-    typeButtonTextSelected: {
+    dropdownPlaceholder: {
+        fontSize: 16,
+        color: colors.placeholder,
+    },
+    dropdownIcon: {
+        fontSize: 12,
+        color: colors.textTertiary,
+    },
+    // Modal styles
+    modalContainer: {
+        flex: 1,
+        backgroundColor: colors.background,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderLight,
+    },
+    modalCloseButton: {
+        width: 60,
+    },
+    modalCloseText: {
+        fontSize: 16,
+        color: colors.primary,
+    },
+    modalTitle: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: colors.text,
+    },
+    debtTypeList: {
+        padding: 16,
+    },
+    debtTypeOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: colors.card,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: colors.borderLight,
+    },
+    debtTypeOptionSelected: {
+        backgroundColor: colors.primary + '15',
+        borderColor: colors.primary,
+    },
+    debtTypeOptionText: {
+        fontSize: 16,
+        color: colors.text,
+    },
+    debtTypeOptionTextSelected: {
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    checkmark: {
+        fontSize: 18,
         color: colors.primary,
         fontWeight: '600',
     },
