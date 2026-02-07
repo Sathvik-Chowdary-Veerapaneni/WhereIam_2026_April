@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, authService, localStorageService, migrationService } from '../services';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GuestSession } from '../services';
 import { logger } from '../utils';
 
@@ -13,11 +14,14 @@ interface AuthContextType {
     isGuest: boolean;
     guestSession: GuestSession | null;
     guestDaysRemaining: number;
+    displayName: string | null;
+    hasDisplayName: boolean;
     signOut: () => Promise<void>;
     checkOnboardingStatus: () => Promise<boolean>;
     startGuestSession: () => Promise<void>;
     endGuestSession: () => Promise<void>;
     refreshGuestStatus: () => Promise<void>;
+    setDisplayName: (name: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,6 +39,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [isGuest, setIsGuest] = useState(false);
     const [guestSession, setGuestSession] = useState<GuestSession | null>(null);
     const [guestDaysRemaining, setGuestDaysRemaining] = useState(0);
+    const [displayName, setDisplayNameState] = useState<string | null>(null);
 
     // Check if user is admin
     const checkAdminStatus = async (userId: string): Promise<boolean> => {
@@ -61,6 +66,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             logger.error('Admin check failed:', error);
             return false;
         }
+    };
+
+    // Load display name from storage/profile
+    const loadDisplayName = async (userId?: string) => {
+        try {
+            if (userId) {
+                // Check auth user metadata first
+                const { data: { user } } = await supabase.auth.getUser();
+                const metaName = user?.user_metadata?.display_name;
+                if (metaName) {
+                    setDisplayNameState(metaName);
+                    return;
+                }
+
+                // Fall back to profiles table
+                const result = await authService.getProfileName(userId);
+                if (result.success && result.displayName) {
+                    setDisplayNameState(result.displayName);
+                    return;
+                }
+            } else {
+                // Guest user - check local storage
+                const guestName = await localStorageService.getGuestDisplayName();
+                if (guestName) {
+                    setDisplayNameState(guestName);
+                    return;
+                }
+            }
+            setDisplayNameState(null);
+        } catch (error) {
+            logger.error('Error loading display name:', error);
+            setDisplayNameState(null);
+        }
+    };
+
+    // Set display name (called from WelcomeScreen)
+    const setDisplayName = (name: string) => {
+        setDisplayNameState(name);
     };
 
     // Check if user has completed onboarding (has income entry)
@@ -154,9 +197,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     const daysRemaining = await localStorageService.getDaysRemaining();
                     setGuestDaysRemaining(daysRemaining);
 
-                    // Check guest onboarding
+                    // Check guest onboarding and display name
                     const localIncome = await localStorageService.getLocalIncome();
                     setIsOnboarded(localIncome.length > 0);
+                    await loadDisplayName();
                 }
             }
         } catch (error) {
@@ -183,6 +227,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setIsGuest(false);
             setGuestSession(null);
             setGuestDaysRemaining(0);
+            setDisplayNameState(null);
             logger.info('User signed out');
         } catch (error) {
             logger.error('Sign out error:', error);
@@ -204,6 +249,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     setIsGuest(false);
 
                     await checkAdminStatus(session.user.id);
+                    await loadDisplayName(session.user.id);
 
                     // Check onboarding after setting user
                     const { data, error } = await supabase
@@ -275,6 +321,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     // Small delay to ensure DB trigger has run for new users
                     setTimeout(async () => {
                         await checkAdminStatus(session.user.id);
+                        await loadDisplayName(session.user.id);
                         await checkOnboardingStatus();
                     }, 500);
                 } else {
@@ -291,13 +338,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
     }, []);
 
-    // Re-check onboarding when user or guest status changes
+    // Re-check onboarding and display name when user or guest status changes
     useEffect(() => {
         if (user) {
             checkAdminStatus(user.id);
             checkOnboardingStatus();
+            loadDisplayName(user.id);
         } else if (isGuest) {
             checkOnboardingStatus();
+            loadDisplayName();
         }
     }, [user?.id, isGuest]);
 
@@ -312,11 +361,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 isGuest,
                 guestSession,
                 guestDaysRemaining,
+                displayName,
+                hasDisplayName: displayName !== null && displayName.trim().length > 0,
                 signOut,
                 checkOnboardingStatus,
                 startGuestSession,
                 endGuestSession,
                 refreshGuestStatus,
+                setDisplayName,
             }}
         >
             {children}
