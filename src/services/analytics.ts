@@ -1,5 +1,6 @@
 import { Mixpanel } from 'mixpanel-react-native';
 import { Config } from '../constants/config';
+import { logger } from '../utils';
 
 // Initialize Mixpanel (lazy initialization)
 let mixpanel: Mixpanel | null = null;
@@ -11,15 +12,15 @@ const getMixpanelInstance = async (): Promise<Mixpanel | null> => {
   try {
     const token = Config.analytics.mixpanelToken;
     if (!token) {
-      console.warn('[Analytics] Mixpanel token not configured, using console logging only');
+      logger.warn('Mixpanel token not configured, using console logging only');
       return null;
     }
 
-    mixpanel = new Mixpanel(token);
+    mixpanel = new Mixpanel(token, false);
     await mixpanel?.init();
     return mixpanel;
   } catch (error) {
-    console.error('[Analytics] Mixpanel initialization error:', error);
+    logger.error('Mixpanel initialization error:', error);
     return null;
   }
 };
@@ -38,11 +39,13 @@ export const analyticsService = {
         instance.track(eventName, properties || {});
       }
     } catch (error) {
-      console.error(`[Analytics] Event tracking error for ${eventName}:`, error);
+      logger.error(`Event tracking error for ${eventName}:`, error);
     }
 
-    // Fallback: log to console
-    console.log(`[Analytics] Event: ${eventName}`, properties);
+    // Fallback: log to console in dev
+    if (__DEV__) {
+      logger.debug(`[Analytics] Event: ${eventName}`, properties);
+    }
   },
 
   async trackScreen(screenName: string, properties?: Record<string, any>) {
@@ -51,14 +54,16 @@ export const analyticsService = {
     try {
       const instance = await getMixpanelInstance();
       if (instance) {
-        instance.trackWithProperties(`screen_${screenName}`, properties || {});
+        instance.track(`screen_${screenName}`, properties || {});
       }
     } catch (error) {
-      console.error(`[Analytics] Screen tracking error for ${screenName}:`, error);
+      logger.error(`Screen tracking error for ${screenName}:`, error);
     }
 
-    // Fallback: log to console
-    console.log(`[Analytics] Screen: ${screenName}`, properties);
+    // Fallback: log to console in dev
+    if (__DEV__) {
+      logger.debug(`[Analytics] Screen: ${screenName}`, properties);
+    }
   },
 
   async setUserProperties(userId: string, properties: Record<string, any>) {
@@ -71,11 +76,13 @@ export const analyticsService = {
         instance.getPeople().set(properties);
       }
     } catch (error) {
-      console.error(`[Analytics] User property error for ${userId}:`, error);
+      logger.error(`User property error for ${userId}:`, error);
     }
 
-    // Fallback: log to console
-    console.log(`[Analytics] Set user properties for ${userId}:`, properties);
+    // Fallback: log to console in dev
+    if (__DEV__) {
+      logger.debug(`[Analytics] Set user properties for ${userId}:`, properties);
+    }
   },
 
   async trackError(error: Error, context?: Record<string, any>) {
@@ -90,14 +97,14 @@ export const analyticsService = {
     try {
       const instance = await getMixpanelInstance();
       if (instance) {
-        instance.trackWithProperties('app_error', errorData);
+        instance.track('app_error', errorData);
       }
     } catch (err) {
-      console.error('[Analytics] Error tracking failed:', err);
+      logger.error('Error tracking failed:', err);
     }
 
-    // Always log errors to console
-    console.error(`[Analytics] Error: ${error.message}`, errorData);
+    // Always log errors
+    logger.error(`App error: ${error.message}`, errorData);
   },
 
   /**
@@ -110,7 +117,7 @@ export const analyticsService = {
         instance.reset();
       }
     } catch (error) {
-      console.error('[Analytics] Reset error:', error);
+      logger.error('Analytics reset error:', error);
     }
   },
 };
