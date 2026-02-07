@@ -169,10 +169,11 @@ export const AuthScreen: React.FC = () => {
     const verifyOtp = async (code: string) => {
         setLoading(true);
         try {
+            const otpType = authMode === 'signup' ? 'signup' : 'email';
             const { success, error } = await authService.verifyEmailOtp(
                 email.trim(),
                 code,
-                'email'
+                otpType
             );
 
             if (!success) {
