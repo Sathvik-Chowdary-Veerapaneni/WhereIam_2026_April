@@ -2,9 +2,9 @@
 
 A gamified debt tracking app that visualizes your financial journey along with your debt. Built with React Native + Expo.
 
-![React Native](https://img.shields.io/badge/React_Native-0.74-61DAFB?logo=react)
-![Expo](https://img.shields.io/badge/Expo-51-000020?logo=expo)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript)
+![React Native](https://img.shields.io/badge/React_Native-0.81-61DAFB?logo=react)
+![Expo](https://img.shields.io/badge/Expo-54-000020?logo=expo)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript)
 ![Supabase](https://img.shields.io/badge/Supabase-Backend-3FCF8E?logo=supabase)
 
 
