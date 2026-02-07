@@ -7,6 +7,7 @@ const LOCAL_STORAGE_KEYS = {
     GUEST_DEBTS: '@debt_mirror_guest_debts',
     GUEST_INCOME: '@debt_mirror_guest_income',
     GUEST_TRANSACTIONS: '@debt_mirror_guest_transactions',
+    GUEST_DISPLAY_NAME: '@debt_mirror_guest_display_name',
 };
 
 export interface GuestSession {
@@ -115,6 +116,7 @@ export const localStorageService = {
             LOCAL_STORAGE_KEYS.GUEST_DEBTS,
             LOCAL_STORAGE_KEYS.GUEST_INCOME,
             LOCAL_STORAGE_KEYS.GUEST_TRANSACTIONS,
+            LOCAL_STORAGE_KEYS.GUEST_DISPLAY_NAME,
         ]);
         logger.info('Guest session cleared');
     },
@@ -318,6 +320,21 @@ export const localStorageService = {
             income: await this.getLocalIncome(),
             transactions: await this.getLocalTransactions(),
         };
+    },
+
+    // Guest Display Name Management
+    async saveGuestDisplayName(name: string): Promise<void> {
+        await AsyncStorage.setItem(LOCAL_STORAGE_KEYS.GUEST_DISPLAY_NAME, name);
+        logger.info('Guest display name saved:', name);
+    },
+
+    async getGuestDisplayName(): Promise<string | null> {
+        try {
+            return await AsyncStorage.getItem(LOCAL_STORAGE_KEYS.GUEST_DISPLAY_NAME);
+        } catch (error) {
+            logger.error('Error getting guest display name:', error);
+            return null;
+        }
     },
 
     // Get days remaining in guest session
