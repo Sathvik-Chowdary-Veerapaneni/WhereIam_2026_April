@@ -5,6 +5,7 @@
 
 export type RootStackParamList = {
   Auth: undefined;
+  Welcome: undefined;
   Onboarding: undefined;
   Home: undefined;
   Dashboard: undefined;
