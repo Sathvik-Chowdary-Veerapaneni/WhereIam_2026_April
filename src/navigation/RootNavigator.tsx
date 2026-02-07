@@ -143,11 +143,13 @@ export const RootNavigator: React.FC = () => {
               component={HomeScreen}
               options={{ title: 'Debt Mirror' }}
             />
-            <Stack.Screen
-              name="Test"
-              component={TestScreen}
-              options={{ title: 'Test' }}
-            />
+            {__DEV__ && (
+              <Stack.Screen
+                name="Test"
+                component={TestScreen}
+                options={{ title: 'Dev Tools' }}
+              />
+            )}
             <Stack.Screen
               name="EditProfile"
               component={EditProfileScreen}
