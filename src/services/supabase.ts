@@ -38,39 +38,38 @@ export const authService = {
     }
   },
 
-  // Magic link (email OTP) authentication
-  async sendMagicLink(email: string) {
+  // Send OTP code to email for sign-in
+  async sendOtp(email: string) {
     try {
-      const redirectUrl = getAuthRedirectUrl();
-      logger.info('Magic link redirect URL:', redirectUrl);
-
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: redirectUrl,
+          shouldCreateUser: false,
         },
       });
       if (error) throw error;
-      logger.info('Magic link sent to:', email);
+      logger.info('OTP sent to:', email);
       return { success: true };
     } catch (error) {
-      console.error('Magic link error:', error);
+      console.error('Send OTP error:', error);
       return { success: false, error };
     }
   },
 
-  // Verify magic link token (called when deep link is opened)
-  async verifyMagicLink(token: string, type: 'magiclink' | 'signup' | 'recovery' = 'magiclink') {
+  // Send OTP code to email for signup (creates user if not exists)
+  async sendSignUpOtp(email: string) {
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        token_hash: token,
-        type,
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+        },
       });
       if (error) throw error;
-      logger.info('Magic link verified successfully');
-      return { success: true, session: data.session, user: data.user };
+      logger.info('Sign-up OTP sent to:', email);
+      return { success: true };
     } catch (error) {
-      console.error('Verify magic link error:', error);
+      console.error('Send sign-up OTP error:', error);
       return { success: false, error };
     }
   },
@@ -107,12 +106,12 @@ export const authService = {
   },
 
   // Verify email OTP (6-digit code)
-  async verifyEmailOtp(email: string, token: string) {
+  async verifyEmailOtp(email: string, token: string, otpType: 'signup' | 'email' = 'email') {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: 'signup',
+        type: otpType,
       });
       if (error) throw error;
       logger.info('Email OTP verified successfully');
@@ -123,11 +122,11 @@ export const authService = {
     }
   },
 
-  // Resend OTP for signup verification
-  async resendOtp(email: string) {
+  // Resend OTP for email verification
+  async resendOtp(email: string, otpType: 'signup' | 'email' = 'email') {
     try {
       const { error } = await supabase.auth.resend({
-        type: 'signup',
+        type: otpType,
         email,
       });
       if (error) throw error;
@@ -136,6 +135,56 @@ export const authService = {
     } catch (error) {
       console.error('Resend OTP error:', error);
       return { success: false, error };
+    }
+  },
+
+  // Update user display name
+  async updateDisplayName(name: string) {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: { display_name: name },
+      });
+      if (error) throw error;
+      logger.info('Display name updated:', name);
+      return { success: true, user: data.user };
+    } catch (error) {
+      console.error('Update display name error:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Save display name to profiles table
+  async saveProfileName(userId: string, displayName: string) {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          display_name: displayName,
+          updated_at: new Date().toISOString(),
+        });
+      if (error) throw error;
+      logger.info('Profile name saved');
+      return { success: true };
+    } catch (error) {
+      console.error('Save profile name error:', error);
+      return { success: false, error };
+    }
+  },
+
+  // Get profile display name
+  async getProfileName(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      return { success: true, displayName: data?.display_name || null };
+    } catch (error) {
+      console.error('Get profile name error:', error);
+      return { success: false, error, displayName: null };
     }
   },
 
