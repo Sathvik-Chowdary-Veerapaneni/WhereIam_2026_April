@@ -1,59 +1,59 @@
 import { Config } from '../constants/config';
+import { logger } from '../utils';
 
 /**
  * Plaid service - placeholder for MVP
- * Actual implementation requires Plaid SDK and native module setup
+ * TODO: Implement actual Plaid SDK integration in v2
+ * Requires: Backend endpoint for token exchange (security requirement)
  */
 export const plaidService = {
   async createLinkToken(userId: string) {
     try {
-      console.log('[Plaid] Creating link token for user:', userId);
+      logger.debug('[Plaid] Creating link token for user:', userId);
 
-      // TODO: Call Plaid API to create link token
-      // In production: call backend endpoint that creates link token
-      // Backend should use Plaid secrets key (never expose public client ID in production)
-
-      // Placeholder response
+      // MVP: Return placeholder - implement backend in v2
+      // Backend should use Plaid secret key (never expose in client)
       return {
         success: true,
-        linkToken: 'link-sandbox-mock-token',
+        linkToken: null,
+        message: 'Plaid integration coming in v2',
       };
     } catch (error) {
-      console.error('[Plaid] Error creating link token:', error);
+      logger.error('[Plaid] Error creating link token:', error);
       return { success: false, error };
     }
   },
 
   async exchangePublicToken(publicToken: string) {
     try {
-      console.log('[Plaid] Exchanging public token');
+      logger.debug('[Plaid] Exchanging public token');
 
-      // TODO: Call backend to exchange publicToken for accessToken
-      // Backend should handle this with Plaid secrets key
-
+      // MVP: Return placeholder - implement backend in v2
       return {
         success: true,
-        accessToken: 'access-token-mock',
+        accessToken: null,
+        message: 'Plaid integration coming in v2',
       };
     } catch (error) {
-      console.error('[Plaid] Error exchanging token:', error);
+      logger.error('[Plaid] Error exchanging token:', error);
       return { success: false, error };
     }
   },
 
-  async getAccounts(accessToken: string) {
+  async getAccounts(_accessToken: string) {
     try {
-      console.log('[Plaid] Fetching accounts');
+      logger.debug('[Plaid] Fetching accounts');
 
-      // TODO: Call backend to fetch accounts using accessToken
-
+      // MVP: Return empty - implement backend in v2
       return {
         success: true,
         accounts: [],
+        message: 'Plaid integration coming in v2',
       };
     } catch (error) {
-      console.error('[Plaid] Error fetching accounts:', error);
+      logger.error('[Plaid] Error fetching accounts:', error);
       return { success: false, error };
     }
   },
 };
+
