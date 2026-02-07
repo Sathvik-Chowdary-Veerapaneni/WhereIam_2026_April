@@ -123,10 +123,10 @@ export const authService = {
   },
 
   // Resend OTP for email verification
-  async resendOtp(email: string, otpType: 'signup' | 'email' = 'email') {
+  async resendOtp(email: string) {
     try {
       const { error } = await supabase.auth.resend({
-        type: otpType,
+        type: 'signup',
         email,
       });
       if (error) throw error;
