@@ -3,6 +3,7 @@ export { LoginScreen } from './LoginScreen';
 export { NotFoundScreen } from './NotFoundScreen';
 export { TestScreen } from './TestScreen';
 export { AuthScreen } from './AuthScreen';
+export { WelcomeScreen } from './WelcomeScreen';
 export { OnboardingScreen } from './OnboardingScreen';
 export { DashboardScreen } from './DashboardScreen';
 export { SettingsScreen } from './SettingsScreen';
