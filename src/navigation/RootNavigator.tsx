@@ -6,6 +6,7 @@ import { RootStackParamList } from './types';
 import { useAuth, useTheme } from '../context';
 import {
   AuthScreen,
+  WelcomeScreen,
   OnboardingScreen,
   DashboardScreen,
   SettingsScreen,
@@ -21,7 +22,7 @@ import {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator: React.FC = () => {
-  const { session, isLoading, isOnboarded, isGuest } = useAuth();
+  const { session, isLoading, isOnboarded, isGuest, hasDisplayName } = useAuth();
   const { isDark, colors } = useTheme();
 
   // Loading screen while checking auth state
@@ -79,6 +80,18 @@ export const RootNavigator: React.FC = () => {
               options={{
                 headerShown: false,
                 animationTypeForReplace: 'pop',
+              }}
+            />
+          </>
+        ) : !hasDisplayName ? (
+          // Welcome Stack - First-time user, collect display name
+          <>
+            <Stack.Screen
+              name="Welcome"
+              component={WelcomeScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
               }}
             />
           </>
